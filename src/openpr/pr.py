@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from rich.console import Console
 
 from openpr.config import Config
@@ -48,7 +46,7 @@ CRITICAL RULES:
 """
 
 
-def run_init(base: Optional[str], unload: bool, config: Config) -> None:
+def run_init(base: str | None, unload: bool, config: Config) -> None:
     base_ref = base or config.pr_default_base
     console.print(f"[bold cyan]Extracting diff against '{base_ref}'...[/bold cyan]")
 
@@ -67,7 +65,9 @@ def run_init(base: Optional[str], unload: bool, config: Config) -> None:
     provider = build_provider(config)
     keep_alive = "0" if unload else config.llm_keep_alive
 
-    with console.status("[bold green]Generating PR title and description...[/bold green]"):
+    with console.status(
+        "[bold green]Generating PR title and description...[/bold green]"
+    ):
         output = provider.generate(
             prompt=diff_result.diff,
             system_prompt=INIT_SYSTEM_PROMPT,
@@ -80,7 +80,9 @@ def run_init(base: Optional[str], unload: bool, config: Config) -> None:
 
 
 def run_review(commits: int, unload: bool, config: Config) -> None:
-    console.print(f"[bold cyan]Extracting diff for the last {commits} commit(s)...[/bold cyan]")
+    console.print(
+        f"[bold cyan]Extracting diff for the last {commits} commit(s)...[/bold cyan]"
+    )
 
     try:
         diff_result = git.get_recent_commits_diff(commits)
@@ -89,7 +91,9 @@ def run_review(commits: int, unload: bool, config: Config) -> None:
         raise SystemExit(1) from exc
 
     if not diff_result.diff.strip():
-        console.print("[yellow]No changes detected in the specified commit range.[/yellow]")
+        console.print(
+            "[yellow]No changes detected in the specified commit range.[/yellow]"
+        )
         raise SystemExit(0)
 
     console.print(f"[dim]{len(diff_result.changed_files)} file(s) changed.[/dim]")
