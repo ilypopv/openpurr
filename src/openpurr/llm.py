@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from openpr.config import Config
-from openpr.providers.base import BaseLLMProvider
-from openpr.providers.ollama import OllamaProvider
+from openpurr.config import Config
+from openpurr.providers.base import BaseLLMProvider
+from openpurr.providers.ollama import OllamaProvider
 
 
 def build_provider(config: Config) -> BaseLLMProvider:

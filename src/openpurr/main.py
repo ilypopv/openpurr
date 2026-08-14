@@ -1,12 +1,11 @@
-"""CLI entrypoint for openpr (command: opo)."""
+"""CLI entrypoint for openpurr (command: opo)."""
 
 from __future__ import annotations
 
 import typer
+from openpurr import pr as pr_module
+from openpurr.config import Config
 from rich.console import Console
-
-from openpr import pr as pr_module
-from openpr.config import Config
 
 console = Console()
 

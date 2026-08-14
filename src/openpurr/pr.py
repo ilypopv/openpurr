@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from openpurr.config import Config
+from openpurr.llm import build_provider
+from openpurr.utils import git
 from rich.console import Console
-
-from openpr.config import Config
-from openpr.llm import build_provider
-from openpr.utils import git
 
 console = Console()
 

@@ -1,6 +1,6 @@
-"""Configuration loader for openpr.
+"""Configuration loader for openpurr.
 
-Reads ~/.openpr (plain TOML, no extension). Creates it with defaults on first run.
+Reads ~/.openpurr (plain TOML, no extension). Creates it with defaults on first run.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-CONFIG_PATH = Path.home() / ".openpr"
+CONFIG_PATH = Path.home() / ".openpurr"
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "llm": {

@@ -6,8 +6,7 @@ import json
 from collections.abc import Generator
 
 import httpx
-
-from openpr.providers.base import BaseLLMProvider
+from openpurr.providers.base import BaseLLMProvider
 
 
 class OllamaError(RuntimeError):
