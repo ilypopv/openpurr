@@ -11,7 +11,7 @@ strictly English-only.
 uv tool install .
 ```
 
-This exposes the `openpr` command globally.
+This exposes the `openpurr` command globally.
 
 ## Requirements
 
