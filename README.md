@@ -1,9 +1,13 @@
 # OpenPullRequest
 
+<img src="https://raw.githubusercontent.com/ilypopv/openpurr/main/imgs/openpurr.png" alt="logo" width="180" align="left">
+
 High-performance local developer CLI utility for automated git PR workflows.
 Built against **Ollama** (local LLM engine) with `gemma4:26b` as the default
 model. All source code, CLI output, prompts, and generated content are
 strictly English-only.
+
+<br clear="left" />
 
 ## Installation
 
