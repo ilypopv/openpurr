@@ -6,6 +6,8 @@ CLI tool that generates PR titles, descriptions, and post-review change summarie
 
 <br clear="left" />
 
+<br clear="left" />
+
 ## Installation
 
 ```bash
