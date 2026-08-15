@@ -1,13 +1,15 @@
 [project]
 name = "openpurr"
 version = "0.1.0"
-description = "CLI tool to generate PR titles, descriptions, and post-review change summaries using a local LLM."
+description = "CLI tool to generate PR titles, descriptions, and post-review change summaries using a local or cloud LLM."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
     "httpx>=0.27.0",
+    "openai>=1.0.0",
+    "anthropic>=0.25.0",
 ]
 
 [project.scripts]
@@ -19,3 +21,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/openpurr"]
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
