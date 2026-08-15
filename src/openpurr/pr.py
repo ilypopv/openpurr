@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from rich.console import Console
+
 from openpurr.config import Config
 from openpurr.llm import build_provider
 from openpurr.utils import git
-from rich.console import Console
 
 console = Console()
 
@@ -45,7 +46,7 @@ CRITICAL RULES:
 """
 
 
-def run_init(base: str | None, unload: bool, config: Config) -> None:
+def run_init(base: str | None, config: Config) -> None:
     base_ref = base or config.pr_default_base
     console.print(f"[bold cyan]Extracting diff against '{base_ref}'...[/bold cyan]")
 
@@ -62,7 +63,6 @@ def run_init(base: str | None, unload: bool, config: Config) -> None:
     console.print(f"[dim]{len(diff_result.changed_files)} file(s) changed.[/dim]")
 
     provider = build_provider(config)
-    keep_alive = "0" if unload else config.llm_keep_alive
 
     with console.status(
         "[bold green]Generating PR title and description...[/bold green]"
@@ -71,14 +71,14 @@ def run_init(base: str | None, unload: bool, config: Config) -> None:
             prompt=diff_result.diff,
             system_prompt=INIT_SYSTEM_PROMPT,
             temperature=config.llm_temperature,
-            keep_alive=keep_alive,
+            keep_alive=config.llm_keep_alive,
         )
 
     console.print()
     console.print(output.strip())
 
 
-def run_review(commits: int, unload: bool, config: Config) -> None:
+def run_review(commits: int, config: Config) -> None:
     console.print(
         f"[bold cyan]Extracting diff for the last {commits} commit(s)...[/bold cyan]"
     )
@@ -98,14 +98,13 @@ def run_review(commits: int, unload: bool, config: Config) -> None:
     console.print(f"[dim]{len(diff_result.changed_files)} file(s) changed.[/dim]")
 
     provider = build_provider(config)
-    keep_alive = "0" if unload else config.llm_keep_alive
 
     with console.status("[bold green]Generating review summary...[/bold green]"):
         output = provider.generate(
             prompt=diff_result.diff,
             system_prompt=REVIEW_SYSTEM_PROMPT,
             temperature=config.llm_temperature,
-            keep_alive=keep_alive,
+            keep_alive=config.llm_keep_alive,
         )
 
     console.print()
