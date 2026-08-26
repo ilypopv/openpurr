@@ -10,11 +10,13 @@ from openpurr import model_catalog
 from openpurr import pr as pr_module
 from openpurr.config import (
     CONFIG_DESCRIPTIONS,
+    CONFIG_PATH,
     SHORT_KEY_MAP,
     Config,
     get_config_value,
     is_first_run,
     load_config,
+    load_prompts,
     set_config_value,
 )
 
@@ -150,6 +152,17 @@ def config_describe() -> None:
         table.add_row(short_key, value, description)
 
     console.print(table)
+
+    prompts = load_prompts()
+    if prompts:
+        overridden = ", ".join(sorted(prompts))
+        console.print(f"\n[dim]Custom prompt overrides active: {overridden}[/dim]")
+    else:
+        console.print(
+            "\n[dim]No custom prompt overrides. Add an `INIT PROMPT:` and/or "
+            "`REVIEW PROMPT:` section after a `---` line in "
+            f"{CONFIG_PATH} to override the built-in prompts.[/dim]"
+        )
 
 
 # ─── opo config get ───────────────────────────────────────────────────────────
