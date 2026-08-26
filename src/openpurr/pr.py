@@ -22,10 +22,7 @@ CRITICAL RULES:
 [2-3 sentences summarizing the core changes]
 
 ## 🛠 Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Refactoring
-- [ ] Breaking change
+[Plain bullet list of every type that applies, chosen from: Bug fix, New feature, Refactoring, Breaking change. A PR can be more than one type — list all that fit. Do NOT use checkboxes or brackets like "- [ ]", just "- Bug fix".]
 
 ## 🔍 Key Changes
 - [Bullet points of technical details]
@@ -79,7 +76,7 @@ def run_init(base: str | None, config: Config) -> None:
     ):
         output = provider.generate(
             prompt=diff_result.diff,
-            system_prompt=INIT_SYSTEM_PROMPT,
+            system_prompt=config.custom_init_prompt or INIT_SYSTEM_PROMPT,
             temperature=config.llm_temperature,
             keep_alive=config.llm_keep_alive,
         )
@@ -113,7 +110,7 @@ def run_review(commits: int, config: Config) -> None:
     with console.status("[bold green]Generating review summary...[/bold green]"):
         output = provider.generate(
             prompt=diff_result.diff,
-            system_prompt=REVIEW_SYSTEM_PROMPT,
+            system_prompt=config.custom_review_prompt or REVIEW_SYSTEM_PROMPT,
             temperature=config.llm_temperature,
             keep_alive=config.llm_keep_alive,
         )

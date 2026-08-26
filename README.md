@@ -4,7 +4,8 @@
 
 CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, llama.cpp, and MLX.
 
-<br clear="left" />
+[![CI](https://img.shields.io/github/actions/workflow/status/ilypopv/openpurr/ci.yml?style=flat-square&label=CI)](https://github.com/ilypopv/openpurr/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
 <br clear="left" />
 
@@ -12,8 +13,16 @@ Built primarily for local-first use — pair it with [Ollama](https://ollama.com
 
 ## Installation
 
+**Recommended**
+
 ```bash
-uv tool install .
+uv tool install openpurr
+```
+
+Or
+
+```bash
+pipx install openpurr
 ```
 
 On first run, the setup wizard creates `~/.openpurr` automatically. You can also run it any time:
@@ -71,6 +80,36 @@ opo config set model gemma4:26b
 opo config set api_key sk-...
 opo config set keep_alive 0s
 ```
+
+### Custom system prompts
+
+The prompts `opo` sends to the LLM aren't fixed — everything after a lone `---` line in
+`~/.openpurr` is free text, not `OPO_KEY=value` config, so it can hold Markdown, headers,
+`=` signs, anything. Add an `INIT PROMPT:` section to override the prompt behind `opo`
+(title + description) and/or a `REVIEW PROMPT:` section to override the one behind
+`opo review`. Either section is optional; whichever is missing keeps the built-in default.
+
+```text
+OPO_PROVIDER=ollama
+OPO_MODEL=gemma4:26b
+OPO_API_KEY=
+OPO_HOST=http://localhost:11434
+OPO_TEMPERATURE=0.0
+OPO_KEEP_ALIVE=5m
+OPO_BASE=main
+
+---
+INIT PROMPT:
+You are a Senior Principal Engineer. Write a terse PR title and description in
+Conventional Commits style. No emoji, no checklists.
+
+REVIEW PROMPT:
+Summarize what changed since the last review in one short paragraph.
+```
+
+`opo config set`/`opo config describe` only ever touch the `OPO_KEY=value` part above the
+`---` line — the prompt section is left exactly as you wrote it, and `opo config describe`
+tells you which of `init`/`review` are currently overridden.
 
 ### Configuration keys
 
