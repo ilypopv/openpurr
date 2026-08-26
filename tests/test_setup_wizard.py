@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from openpurr import setup_wizard
 
 
@@ -25,8 +23,12 @@ def _run_with_answers(select_answers, text_answers, password_answers=None, model
         written.update(data)
 
     with (
-        patch.object(setup_wizard, "_select", side_effect=lambda *a, **k: next(select_iter)),
-        patch.object(setup_wizard, "_text", side_effect=lambda *a, **k: next(text_iter)),
+        patch.object(
+            setup_wizard, "_select", side_effect=lambda *a, **k: next(select_iter)
+        ),
+        patch.object(
+            setup_wizard, "_text", side_effect=lambda *a, **k: next(text_iter)
+        ),
         patch.object(
             setup_wizard, "_password", side_effect=lambda *a, **k: next(password_iter)
         ),
@@ -122,7 +124,9 @@ class TestLocalServerFlow:
 class TestAbort:
     def test_cancelled_select_returns_false_without_writing(self):
         with (
-            patch.object(setup_wizard, "_select", side_effect=setup_wizard._SetupAborted),
+            patch.object(
+                setup_wizard, "_select", side_effect=setup_wizard._SetupAborted
+            ),
             patch.object(setup_wizard, "write_config") as mock_write,
         ):
             assert setup_wizard.run_setup() is False
