@@ -1,96 +1,71 @@
-"""Tests for openpurr.config — TOML rendering, merge, read/write, get/set."""
+"""Tests for openpurr.config — flat env-style read/write, get/set."""
 
 from __future__ import annotations
-
-import tomllib
 
 import pytest
 
 from openpurr.config import (
     DEFAULT_CONFIG,
     Config,
-    _deep_merge,
-    _render_toml,
+    _parse_env,
+    _render_env,
     get_config_value,
     is_first_run,
     load_config,
+    resolve_base_url,
     set_config_value,
     write_config,
 )
 
-# ─── _deep_merge ─────────────────────────────────────────────────────────────
+# ─── _parse_env ────────────────────────────────────────────────────────────────
 
 
-class TestDeepMerge:
-    def test_override_wins(self):
-        base = {"llm": {"model": "base-model", "provider": "ollama"}}
-        result = _deep_merge(base, {"llm": {"model": "override-model"}})
-        assert result["llm"]["model"] == "override-model"
-        assert result["llm"]["provider"] == "ollama"
+class TestParseEnv:
+    def test_basic_key_value(self):
+        assert _parse_env("OPO_PROVIDER=ollama\n") == {"OPO_PROVIDER": "ollama"}
 
-    def test_nested_dict_merged_not_replaced(self):
-        base = {"llm": {"a": 1, "b": 2}}
-        result = _deep_merge(base, {"llm": {"b": 99}})
-        assert result["llm"]["a"] == 1
-        assert result["llm"]["b"] == 99
-
-    def test_new_top_level_section_added(self):
-        base = {"pr": {"default_base": "main"}}
-        result = _deep_merge(base, {"extra": {"x": 1}})
-        assert "extra" in result
-        assert result["pr"]["default_base"] == "main"
-
-    def test_scalar_override_replaces(self):
-        base = {"llm": {"provider": "ollama"}}
-        result = _deep_merge(base, {"llm": {"provider": "openai"}})
-        assert result["llm"]["provider"] == "openai"
-
-    def test_base_unchanged(self):
-        base = {"llm": {"model": "original"}}
-        _deep_merge(base, {"llm": {"model": "changed"}})
-        assert base["llm"]["model"] == "original"
-
-
-# ─── _render_toml ─────────────────────────────────────────────────────────────
-
-
-class TestRenderToml:
-    def test_string_values_quoted(self):
-        toml = _render_toml({"llm": {"provider": "ollama", "model": "gemma4:26b"}})
-        assert "[llm]" in toml
-        assert 'provider = "ollama"' in toml
-        assert 'model = "gemma4:26b"' in toml
-
-    def test_float_rendered(self):
-        assert "temperature = 0.0" in _render_toml({"llm": {"temperature": 0.0}})
-
-    def test_bool_lowercase(self):
-        toml = _render_toml({"flags": {"enabled": True, "disabled": False}})
-        assert "enabled = true" in toml
-        assert "disabled = false" in toml
-
-    def test_round_trips_through_tomllib(self):
-        data = {
-            "llm": {"provider": "openai", "temperature": 0.5, "keep_alive": "5m"},
-            "pr": {"default_base": "develop"},
+    def test_no_quoting(self):
+        assert _parse_env("OPO_MODEL=gemma4:26b-mlx\n") == {
+            "OPO_MODEL": "gemma4:26b-mlx"
         }
-        parsed = tomllib.loads(_render_toml(data))
-        assert parsed["llm"]["provider"] == "openai"
-        assert parsed["llm"]["temperature"] == pytest.approx(0.5)
-        assert parsed["pr"]["default_base"] == "develop"
 
-    def test_special_chars_escaped(self):
-        data = {"llm": {"api_key": 'sk-"test"\\path'}}
-        parsed = tomllib.loads(_render_toml(data))
-        assert parsed["llm"]["api_key"] == 'sk-"test"\\path'
+    def test_blank_lines_ignored(self):
+        assert _parse_env("\nOPO_PROVIDER=ollama\n\n") == {"OPO_PROVIDER": "ollama"}
 
-    def test_each_section_has_header(self):
-        toml = _render_toml({"llm": {"a": "1"}, "pr": {"b": "2"}})
-        assert "[llm]" in toml
-        assert "[pr]" in toml
+    def test_comments_ignored(self):
+        assert _parse_env("# a comment\nOPO_PROVIDER=ollama\n") == {
+            "OPO_PROVIDER": "ollama"
+        }
+
+    def test_lines_without_equals_ignored(self):
+        assert _parse_env("not a kv line\nOPO_PROVIDER=ollama\n") == {
+            "OPO_PROVIDER": "ollama"
+        }
+
+    def test_empty_value(self):
+        assert _parse_env("OPO_API_KEY=\n") == {"OPO_API_KEY": ""}
+
+    def test_whitespace_stripped(self):
+        assert _parse_env("  OPO_PROVIDER = ollama  \n") == {"OPO_PROVIDER": "ollama"}
 
 
-# ─── is_first_run ─────────────────────────────────────────────────────────────
+# ─── _render_env ───────────────────────────────────────────────────────────────
+
+
+class TestRenderEnv:
+    def test_no_quotes_no_sections(self):
+        rendered = _render_env({"OPO_PROVIDER": "ollama", "OPO_MODEL": "gemma4:26b"})
+        assert '"' not in rendered
+        assert "[" not in rendered
+        assert "OPO_PROVIDER=ollama" in rendered
+        assert "OPO_MODEL=gemma4:26b" in rendered
+
+    def test_round_trips_through_parse_env(self):
+        data = {"OPO_PROVIDER": "openai", "OPO_TEMPERATURE": "0.5"}
+        assert _parse_env(_render_env(data)) == data
+
+
+# ─── is_first_run ──────────────────────────────────────────────────────────────
 
 
 class TestIsFirstRun:
@@ -100,47 +75,39 @@ class TestIsFirstRun:
 
     def test_false_when_file_present(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
-        p.write_text('[llm]\nprovider = "ollama"\n')
+        p.write_text("OPO_PROVIDER=ollama\n")
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         assert is_first_run() is False
 
 
-# ─── load_config ──────────────────────────────────────────────────────────────
+# ─── load_config ───────────────────────────────────────────────────────────────
 
 
 class TestLoadConfig:
     def test_returns_defaults_when_no_file(self, monkeypatch, tmp_path):
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
         cfg = load_config()
-        assert cfg["llm"]["provider"] == DEFAULT_CONFIG["llm"]["provider"]
-        assert cfg["pr"]["default_base"] == DEFAULT_CONFIG["pr"]["default_base"]
+        assert cfg["OPO_PROVIDER"] == DEFAULT_CONFIG["OPO_PROVIDER"]
+        assert cfg["OPO_BASE"] == DEFAULT_CONFIG["OPO_BASE"]
 
     def test_file_values_override_defaults(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
-        p.write_text('[llm]\nmodel = "gpt-4o"\nprovider = "openai"\n')
+        p.write_text("OPO_MODEL=gpt-4o\nOPO_PROVIDER=openai\n")
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         cfg = load_config()
-        assert cfg["llm"]["model"] == "gpt-4o"
-        assert cfg["llm"]["provider"] == "openai"
+        assert cfg["OPO_MODEL"] == "gpt-4o"
+        assert cfg["OPO_PROVIDER"] == "openai"
 
     def test_unspecified_keys_keep_defaults(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
-        p.write_text('[pr]\ndefault_base = "develop"\n')
+        p.write_text("OPO_BASE=develop\n")
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         cfg = load_config()
-        assert cfg["pr"]["default_base"] == "develop"
-        assert cfg["llm"]["provider"] == DEFAULT_CONFIG["llm"]["provider"]
-
-    def test_unspecified_llm_keys_keep_defaults(self, monkeypatch, tmp_path):
-        p = tmp_path / ".openpurr"
-        p.write_text('[llm]\nmodel = "custom"\n')
-        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
-        cfg = load_config()
-        assert "temperature" in cfg["llm"]
-        assert "keep_alive" in cfg["llm"]
+        assert cfg["OPO_BASE"] == "develop"
+        assert cfg["OPO_PROVIDER"] == DEFAULT_CONFIG["OPO_PROVIDER"]
 
 
-# ─── write_config / round-trip ────────────────────────────────────────────────
+# ─── write_config / round-trip ─────────────────────────────────────────────────
 
 
 class TestWriteConfig:
@@ -148,31 +115,30 @@ class TestWriteConfig:
         p = tmp_path / ".openpurr"
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         data = {
-            "llm": {
-                "provider": "anthropic",
-                "model": "claude-opus-4-8",
-                "api_key": "sk-ant",
-                "host": "",
-                "temperature": 0.0,
-                "keep_alive": "0s",
-            },
-            "pr": {"default_base": "develop"},
+            "OPO_PROVIDER": "anthropic",
+            "OPO_MODEL": "claude-opus-4-8",
+            "OPO_API_KEY": "sk-ant",
+            "OPO_HOST": "",
+            "OPO_TEMPERATURE": "0.0",
+            "OPO_KEEP_ALIVE": "0s",
+            "OPO_BASE": "develop",
         }
         write_config(data)
         loaded = load_config()
-        assert loaded["llm"]["provider"] == "anthropic"
-        assert loaded["llm"]["model"] == "claude-opus-4-8"
-        assert loaded["pr"]["default_base"] == "develop"
+        assert loaded["OPO_PROVIDER"] == "anthropic"
+        assert loaded["OPO_MODEL"] == "claude-opus-4-8"
+        assert loaded["OPO_BASE"] == "develop"
 
-    def test_file_is_valid_toml(self, monkeypatch, tmp_path):
+    def test_file_has_no_quotes_or_sections(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         write_config(DEFAULT_CONFIG)
-        with p.open("rb") as f:
-            tomllib.load(f)  # must not raise
+        content = p.read_text()
+        assert '"' not in content
+        assert "[" not in content
 
 
-# ─── set_config_value ─────────────────────────────────────────────────────────
+# ─── set_config_value ──────────────────────────────────────────────────────────
 
 
 class TestSetConfigValue:
@@ -180,13 +146,13 @@ class TestSetConfigValue:
         p = tmp_path / ".openpurr"
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         set_config_value("model", "gpt-4o-mini")
-        assert load_config()["llm"]["model"] == "gpt-4o-mini"
+        assert load_config()["OPO_MODEL"] == "gpt-4o-mini"
 
-    def test_coerces_float(self, monkeypatch, tmp_path):
+    def test_stores_raw_string(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         set_config_value("temperature", "0.7")
-        assert load_config()["llm"]["temperature"] == pytest.approx(0.7)
+        assert load_config()["OPO_TEMPERATURE"] == "0.7"
 
     def test_preserves_other_values_on_repeated_set(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
@@ -194,16 +160,16 @@ class TestSetConfigValue:
         set_config_value("model", "first")
         set_config_value("provider", "openai")
         cfg = load_config()
-        assert cfg["llm"]["model"] == "first"
-        assert cfg["llm"]["provider"] == "openai"
+        assert cfg["OPO_MODEL"] == "first"
+        assert cfg["OPO_PROVIDER"] == "openai"
 
-    def test_invalid_key_format_raises(self, monkeypatch, tmp_path):
+    def test_invalid_key_raises(self, monkeypatch, tmp_path):
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / ".openpurr")
         with pytest.raises(ValueError, match="Unknown key"):
             set_config_value("badkey", "value")
 
 
-# ─── get_config_value ─────────────────────────────────────────────────────────
+# ─── get_config_value ──────────────────────────────────────────────────────────
 
 
 class TestGetConfigValue:
@@ -215,35 +181,50 @@ class TestGetConfigValue:
 
     def test_returns_default_for_existing_key(self, monkeypatch, tmp_path):
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
-        assert get_config_value("base") == DEFAULT_CONFIG["pr"]["default_base"]
+        assert get_config_value("base") == DEFAULT_CONFIG["OPO_BASE"]
 
-    def test_raises_key_error_for_unknown_key(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
-        with pytest.raises(KeyError):
-            get_config_value("llm.nonexistent_key_xyz")
-
-    def test_raises_value_error_for_bad_format(self, monkeypatch, tmp_path):
+    def test_raises_value_error_for_unknown_key(self, monkeypatch, tmp_path):
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
         with pytest.raises(ValueError):
-            get_config_value("nodot")
+            get_config_value("nonexistent_key_xyz")
 
 
-# ─── Config class ─────────────────────────────────────────────────────────────
+# ─── resolve_base_url ──────────────────────────────────────────────────────────
+
+
+class TestResolveBaseUrl:
+    def test_custom_host_wins(self):
+        assert (
+            resolve_base_url("openai", "https://my-proxy.example.com/v1")
+            == "https://my-proxy.example.com/v1"
+        )
+
+    def test_default_ollama_host_falls_back_to_provider_default(self):
+        assert (
+            resolve_base_url("openrouter", "http://localhost:11434")
+            == "https://openrouter.ai/api/v1"
+        )
+
+    def test_no_host_falls_back_to_provider_default(self):
+        assert resolve_base_url("deepseek", None) == "https://api.deepseek.com/v1"
+
+    def test_unknown_provider_with_no_host_returns_none(self):
+        assert resolve_base_url("openai", None) is None
+
+
+# ─── Config class ──────────────────────────────────────────────────────────────
 
 
 class TestConfigClass:
     def test_all_properties(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
         p.write_text(
-            "[llm]\n"
-            'provider = "openai"\n'
-            'model = "gpt-4o"\n'
-            'api_key = "sk-x"\n'
-            'host = ""\n'
-            "temperature = 0.2\n"
-            'keep_alive = "0s"\n'
-            "[pr]\n"
-            'default_base = "develop"\n'
+            "OPO_PROVIDER=openai\n"
+            "OPO_MODEL=gpt-4o\n"
+            "OPO_API_KEY=sk-x\n"
+            "OPO_TEMPERATURE=0.2\n"
+            "OPO_KEEP_ALIVE=0s\n"
+            "OPO_BASE=develop\n"
         )
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
         cfg = Config()
@@ -258,3 +239,8 @@ class TestConfigClass:
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
         cfg = Config()
         assert cfg.llm_host == "http://localhost:11434"
+
+    def test_model_defaults_to_empty_string(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
+        cfg = Config()
+        assert cfg.llm_model == ""

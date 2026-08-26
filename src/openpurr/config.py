@@ -1,73 +1,45 @@
-"""Configuration loader and writer for openpurr (~/.openpurr)."""
+"""Configuration loader and writer for openpurr (~/.openpurr).
+
+Storage format is flat `OPO_KEY=value` lines (no sections, no quoting) —
+mirrors opencommit's `~/.opencommit` rather than TOML.
+"""
 
 from __future__ import annotations
 
-import copy
-import tomllib
 from pathlib import Path
 from typing import Any
 
 CONFIG_PATH = Path.home() / ".openpurr"
 
-DEFAULT_CONFIG: dict[str, Any] = {
-    "llm": {
-        "provider": "ollama",
-        "model": "gemma4:26b",
-        "api_key": "",
-        "host": "http://localhost:11434",
-        "temperature": 0.0,
-        "keep_alive": "5m",
-    },
-    "pr": {
-        "default_base": "main",
-    },
+DEFAULT_CONFIG: dict[str, str] = {
+    "OPO_PROVIDER": "ollama",
+    "OPO_MODEL": "",
+    "OPO_API_KEY": "",
+    "OPO_HOST": "http://localhost:11434",
+    "OPO_TEMPERATURE": "0.0",
+    "OPO_KEEP_ALIVE": "5m",
+    "OPO_BASE": "main",
 }
 
-# Short CLI keys → internal dotted keys (section.field)
+# Short CLI keys → OPO_* env keys
 SHORT_KEY_MAP: dict[str, str] = {
-    "provider": "llm.provider",
-    "model": "llm.model",
-    "api_key": "llm.api_key",
-    "host": "llm.host",
-    "temperature": "llm.temperature",
-    "keep_alive": "llm.keep_alive",
-    "base": "pr.default_base",
+    "provider": "OPO_PROVIDER",
+    "model": "OPO_MODEL",
+    "api_key": "OPO_API_KEY",
+    "host": "OPO_HOST",
+    "temperature": "OPO_TEMPERATURE",
+    "keep_alive": "OPO_KEEP_ALIVE",
+    "base": "OPO_BASE",
 }
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
     "provider": "LLM provider — ollama | openai | anthropic | openrouter | deepseek | llamacpp | mlx",
-    "model": "Model name (e.g. gemma4:26b, gpt-4o-mini, claude-opus-4-8)",
+    "model": "Model name (fetched live per-provider via `opo models`)",
     "api_key": "API key for cloud providers (not required for ollama / llamacpp / mlx)",
     "host": "Base URL — Ollama default is http://localhost:11434; custom endpoint for other providers",
     "temperature": "Sampling temperature: 0.0 = deterministic",
     "keep_alive": "Ollama VRAM keep-alive duration — 0s = unload immediately, 5m = keep 5 min",
     "base": "Default base branch to diff against (main, master, …)",
-}
-
-KNOWN_MODELS: dict[str, list[str]] = {
-    "openai": [
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-4-turbo",
-        "gpt-4",
-        "gpt-3.5-turbo",
-    ],
-    "anthropic": [
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5-20251001",
-    ],
-    "openrouter": [
-        "openai/gpt-4o-mini",
-        "anthropic/claude-sonnet-4",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "deepseek/deepseek-chat:free",
-        "google/gemini-2.5-flash-preview",
-    ],
-    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "llamacpp": [],
-    "mlx": [],
-    "ollama": [],
 }
 
 PROVIDER_BASE_URLS: dict[str, str] = {
@@ -78,113 +50,93 @@ PROVIDER_BASE_URLS: dict[str, str] = {
 }
 
 
+def resolve_base_url(provider: str, host: str | None) -> str | None:
+    """Explicit non-default host wins, otherwise fall back to the provider's default."""
+    if host and host != DEFAULT_CONFIG["OPO_HOST"]:
+        return host
+    return PROVIDER_BASE_URLS.get(provider)
+
+
 def is_first_run() -> bool:
     return not CONFIG_PATH.exists()
 
 
-def _render_toml(data: dict[str, Any]) -> str:
-    lines: list[str] = []
-    for section, values in data.items():
-        lines.append(f"[{section}]")
-        for key, val in values.items():
-            if isinstance(val, bool):
-                lines.append(f"{key} = {'true' if val else 'false'}")
-            elif isinstance(val, str):
-                escaped = val.replace("\\", "\\\\").replace('"', '\\"')
-                lines.append(f'{key} = "{escaped}"')
-            elif isinstance(val, float) or isinstance(val, int):
-                lines.append(f"{key} = {val}")
-        lines.append("")
-    return "\n".join(lines)
+def _parse_env(text: str) -> dict[str, str]:
+    data: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        data[key.strip()] = value.strip()
+    return data
 
 
-def write_config(data: dict[str, Any]) -> None:
-    CONFIG_PATH.write_text(_render_toml(data))
+def _render_env(data: dict[str, str]) -> str:
+    return "\n".join(f"{key}={value}" for key, value in data.items()) + "\n"
 
 
-def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
+def write_config(data: dict[str, str]) -> None:
+    CONFIG_PATH.write_text(_render_env(data))
 
 
-def load_config() -> dict[str, Any]:
+def load_config() -> dict[str, str]:
     if not CONFIG_PATH.exists():
-        return copy.deepcopy(DEFAULT_CONFIG)
-    with CONFIG_PATH.open("rb") as f:
-        return _deep_merge(DEFAULT_CONFIG, tomllib.load(f))
+        return dict(DEFAULT_CONFIG)
+    return {**DEFAULT_CONFIG, **_parse_env(CONFIG_PATH.read_text())}
 
 
 def _resolve_key(key: str) -> str:
-    """Resolve a short key (e.g. 'model') to its dotted form ('llm.model')."""
+    """Resolve a short key (e.g. 'model') to its OPO_* form ('OPO_MODEL')."""
     return SHORT_KEY_MAP.get(key, key)
 
 
 def set_config_value(key: str, value: str) -> None:
-    dotted_key = _resolve_key(key)
-    parts = dotted_key.split(".", 1)
-    if len(parts) != 2:
+    env_key = _resolve_key(key)
+    if env_key not in DEFAULT_CONFIG:
         raise ValueError(f"Unknown key {key!r}. Valid keys: {', '.join(SHORT_KEY_MAP)}")
-    section, key = parts
     data = load_config()
-    if section not in data:
-        data[section] = {}
-    default_val = DEFAULT_CONFIG.get(section, {}).get(key)
-    if isinstance(default_val, float):
-        data[section][key] = float(value)
-    elif isinstance(default_val, int):
-        data[section][key] = int(value)
-    elif isinstance(default_val, bool):
-        data[section][key] = value.lower() in ("true", "1", "yes")
-    else:
-        data[section][key] = value
+    data[env_key] = value
     write_config(data)
 
 
 def get_config_value(key: str) -> Any:
-    dotted_key = _resolve_key(key)
-    parts = dotted_key.split(".", 1)
-    if len(parts) != 2:
+    env_key = _resolve_key(key)
+    if env_key not in DEFAULT_CONFIG:
         raise ValueError(f"Unknown key {key!r}. Valid keys: {', '.join(SHORT_KEY_MAP)}")
-    section, field = parts
-    data = load_config()
-    if section not in data or field not in data[section]:
-        raise KeyError(f"Config key not found: {key!r}")
-    return data[section][field]
+    return load_config()[env_key]
 
 
 class Config:
-    def __init__(self, data: dict[str, Any] | None = None) -> None:
+    def __init__(self, data: dict[str, str] | None = None) -> None:
         self._data = data if data is not None else load_config()
 
     @property
     def llm_provider(self) -> str:
-        return self._data["llm"]["provider"]
+        return self._data.get("OPO_PROVIDER", DEFAULT_CONFIG["OPO_PROVIDER"])
 
     @property
     def llm_model(self) -> str:
-        return self._data["llm"]["model"]
+        return self._data.get("OPO_MODEL", DEFAULT_CONFIG["OPO_MODEL"])
 
     @property
     def llm_api_key(self) -> str:
-        return self._data["llm"].get("api_key", "")
+        return self._data.get("OPO_API_KEY", "")
 
     @property
     def llm_host(self) -> str:
-        return self._data["llm"].get("host", "http://localhost:11434")
+        return self._data.get("OPO_HOST", DEFAULT_CONFIG["OPO_HOST"])
 
     @property
     def llm_temperature(self) -> float:
-        return self._data["llm"]["temperature"]
+        return float(
+            self._data.get("OPO_TEMPERATURE", DEFAULT_CONFIG["OPO_TEMPERATURE"])
+        )
 
     @property
     def llm_keep_alive(self) -> str:
-        return self._data["llm"]["keep_alive"]
+        return self._data.get("OPO_KEEP_ALIVE", DEFAULT_CONFIG["OPO_KEEP_ALIVE"])
 
     @property
     def pr_default_base(self) -> str:
-        return self._data["pr"]["default_base"]
+        return self._data.get("OPO_BASE", DEFAULT_CONFIG["OPO_BASE"])

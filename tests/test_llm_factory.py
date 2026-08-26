@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import copy
-
 import pytest
 
 from openpurr.config import DEFAULT_CONFIG, PROVIDER_BASE_URLS, Config
@@ -12,13 +10,21 @@ from openpurr.providers.anthropic import AnthropicProvider
 from openpurr.providers.ollama import OllamaProvider
 from openpurr.providers.openai import OpenAICompatibleProvider
 
+_SHORT_TO_ENV = {
+    "llm.provider": "OPO_PROVIDER",
+    "llm.model": "OPO_MODEL",
+    "llm.api_key": "OPO_API_KEY",
+    "llm.host": "OPO_HOST",
+    "llm.temperature": "OPO_TEMPERATURE",
+    "llm.keep_alive": "OPO_KEEP_ALIVE",
+}
+
 
 def _cfg(**overrides) -> Config:
-    """Build a Config with specific llm/pr overrides."""
-    data = copy.deepcopy(DEFAULT_CONFIG)
+    """Build a Config with specific overrides, e.g. _cfg(**{'llm.provider': 'openai'})."""
+    data = dict(DEFAULT_CONFIG)
     for dotted, val in overrides.items():
-        section, key = dotted.split(".", 1)
-        data[section][key] = val
+        data[_SHORT_TO_ENV[dotted]] = val
     return Config(data)
 
 

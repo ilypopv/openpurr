@@ -153,9 +153,11 @@ class TestOllamaProviderGenerate:
         resp.raise_for_status.side_effect = httpx.HTTPStatusError(
             "404", request=MagicMock(), response=MagicMock()
         )
-        with patch("openpurr.providers.ollama.httpx.post", return_value=resp):
-            with pytest.raises(OllamaError, match="API error"):
-                provider.generate("p", "s")
+        with (
+            patch("openpurr.providers.ollama.httpx.post", return_value=resp),
+            pytest.raises(OllamaError, match="API error"),
+        ):
+            provider.generate("p", "s")
 
 
 # ─── generate_stream() ────────────────────────────────────────────────────────
@@ -199,6 +201,8 @@ class TestOllamaProviderStream:
         mock_ctx = MagicMock()
         mock_ctx.__enter__ = MagicMock(side_effect=httpx.ConnectError("refused"))
         mock_ctx.__exit__ = MagicMock(return_value=False)
-        with patch("openpurr.providers.ollama.httpx.stream", return_value=mock_ctx):
-            with pytest.raises(OllamaError, match="Unable to connect"):
-                list(provider.generate_stream("p", "s"))
+        with (
+            patch("openpurr.providers.ollama.httpx.stream", return_value=mock_ctx),
+            pytest.raises(OllamaError, match="Unable to connect"),
+        ):
+            list(provider.generate_stream("p", "s"))
