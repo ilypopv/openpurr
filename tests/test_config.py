@@ -25,7 +25,7 @@ class TestParseEnv:
         assert _parse_env("OPO_PROVIDER=ollama\n") == {"OPO_PROVIDER": "ollama"}
 
     def test_no_quoting(self):
-        assert _parse_env('OPO_MODEL=gemma4:26b-mlx\n') == {
+        assert _parse_env("OPO_MODEL=gemma4:26b-mlx\n") == {
             "OPO_MODEL": "gemma4:26b-mlx"
         }
 
