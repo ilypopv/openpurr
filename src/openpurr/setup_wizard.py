@@ -7,7 +7,12 @@ from rich.console import Console
 from rich.panel import Panel
 
 from openpurr import model_catalog
-from openpurr.config import CONFIG_PATH, DEFAULT_CONFIG, PROVIDER_BASE_URLS, write_config
+from openpurr.config import (
+    CONFIG_PATH,
+    DEFAULT_CONFIG,
+    PROVIDER_BASE_URLS,
+    write_config,
+)
 
 console = Console()
 
