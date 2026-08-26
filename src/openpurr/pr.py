@@ -46,7 +46,17 @@ CRITICAL RULES:
 """
 
 
+def _require_model(config: Config) -> None:
+    if not config.llm_model:
+        console.print(
+            "[bold red]No model configured.[/bold red] Run [bold cyan]opo setup[/bold cyan] "
+            "or [bold cyan]opo config set model <name>[/bold cyan]."
+        )
+        raise SystemExit(1)
+
+
 def run_init(base: str | None, config: Config) -> None:
+    _require_model(config)
     base_ref = base or config.pr_default_base
     console.print(f"[bold cyan]Extracting diff against '{base_ref}'...[/bold cyan]")
 
@@ -79,6 +89,7 @@ def run_init(base: str | None, config: Config) -> None:
 
 
 def run_review(commits: int, config: Config) -> None:
+    _require_model(config)
     console.print(
         f"[bold cyan]Extracting diff for the last {commits} commit(s)...[/bold cyan]"
     )
