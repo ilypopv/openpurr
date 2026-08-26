@@ -77,6 +77,17 @@ class TestListModelsOpenAICompatible:
             names = model_catalog.list_models("openai", api_key="k")
         assert names == ["gpt-4o"]
 
+    def test_gemini_filters_non_chat_models(self):
+        models = [
+            _model("gemini-2.0-flash", 100),
+            _model("text-embedding-004", 200),
+        ]
+        fake_client = MagicMock()
+        fake_client.models.list.return_value = models
+        with patch("openai.OpenAI", return_value=fake_client):
+            names = model_catalog.list_models("gemini", api_key="k")
+        assert names == ["gemini-2.0-flash"]
+
     def test_non_openai_providers_not_filtered(self):
         models = [_model("deepseek-chat", 100), _model("deepseek-reasoner", 200)]
         fake_client = MagicMock()
