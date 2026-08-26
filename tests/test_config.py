@@ -208,6 +208,12 @@ class TestResolveBaseUrl:
     def test_no_host_falls_back_to_provider_default(self):
         assert resolve_base_url("deepseek", None) == "https://api.deepseek.com/v1"
 
+    def test_gemini_falls_back_to_provider_default(self):
+        assert (
+            resolve_base_url("gemini", None)
+            == "https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
+
     def test_unknown_provider_with_no_host_returns_none(self):
         assert resolve_base_url("openai", None) is None
 
