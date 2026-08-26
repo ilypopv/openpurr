@@ -4,8 +4,6 @@
 
 CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, llama.cpp, and MLX.
 
-Built primarily for local-first use — pair it with [Ollama](https://ollama.com) and a Gemma model (Google's Gemma family is currently the best fit for this kind of task at a size you can run locally) for a free, fully offline workflow. On Apple Silicon Macs, prefer the `-mlx` tagged variant of your chosen model (e.g. `gemma4:26b-mlx`) — it runs on Apple's MLX framework instead of plain GGUF and is noticeably faster on that hardware. Don't want to run anything locally? Google's Gemini API has a generous free tier and is a great low-friction cloud option.
-
 <br clear="left" />
 
 <br clear="left" />
