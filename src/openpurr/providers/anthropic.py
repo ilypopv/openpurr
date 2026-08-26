@@ -59,7 +59,6 @@ class AnthropicProvider(BaseLLMProvider):
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
             ) as stream:
-                for text in stream.text_stream:
-                    yield text
+                yield from stream.text_stream
         except Exception as exc:
             raise AnthropicError(str(exc)) from exc
