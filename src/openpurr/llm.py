@@ -7,7 +7,7 @@ from openpurr.providers.base import BaseLLMProvider
 from openpurr.providers.ollama import OllamaProvider
 
 OPENAI_COMPATIBLE_PROVIDERS = frozenset(
-    {"openai", "openrouter", "deepseek", "llamacpp", "mlx"}
+    {"openai", "gemini", "openrouter", "deepseek", "llamacpp", "mlx"}
 )
 
 
@@ -34,5 +34,5 @@ def build_provider(config: Config) -> BaseLLMProvider:
 
     raise ValueError(
         f"Unsupported LLM provider: '{provider}'. "
-        f"Supported: ollama, openai, anthropic, openrouter, deepseek, llamacpp, mlx"
+        f"Supported: ollama, openai, anthropic, gemini, openrouter, deepseek, llamacpp, mlx"
     )
