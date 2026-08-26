@@ -4,7 +4,8 @@
 
 CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, llama.cpp, and MLX.
 
-<br clear="left" />
+[![CI](https://img.shields.io/github/actions/workflow/status/ilypopv/openpurr/ci.yml?style=flat-square&label=CI)](https://github.com/ilypopv/openpurr/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
 <br clear="left" />
 
@@ -12,8 +13,16 @@ Built primarily for local-first use — pair it with [Ollama](https://ollama.com
 
 ## Installation
 
+**Recommended**
+
 ```bash
-uv tool install .
+uv tool install openpurr
+```
+
+Or
+
+```bash
+pipx install openpurr
 ```
 
 On first run, the setup wizard creates `~/.openpurr` automatically. You can also run it any time:
