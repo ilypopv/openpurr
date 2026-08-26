@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/ilypopv/openpurr/main/imgs/openpurr.png" alt="logo" width="180" align="left">
 
-CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, OpenRouter, DeepSeek, llama.cpp, and MLX.
+CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, llama.cpp, and MLX.
 
 <br clear="left" />
 
@@ -74,7 +74,7 @@ opo config set keep_alive 0s
 
 | Key | Env var | Default | Description |
 | --- | ------- | ------- | ----------- |
-| `provider` | `OPO_PROVIDER` | `ollama` | `ollama` · `openai` · `anthropic` · `openrouter` · `deepseek` · `llamacpp` · `mlx` |
+| `provider` | `OPO_PROVIDER` | `ollama` | `ollama` · `openai` · `anthropic` · `gemini` · `openrouter` · `deepseek` · `llamacpp` · `mlx` |
 | `model` | `OPO_MODEL` | _(empty)_ | Model name — set via `opo setup` or `opo config set model <name>` |
 | `api_key` | `OPO_API_KEY` | _(empty)_ | API key for cloud providers |
 | `host` | `OPO_HOST` | `http://localhost:11434` | Base URL — Ollama default; set to a custom endpoint when needed |
@@ -107,4 +107,4 @@ opo models
 opo models --provider anthropic
 ```
 
-Model lists are always fetched live from the provider — Ollama's `/api/tags`, OpenAI/Anthropic/OpenRouter/DeepSeek/llama.cpp/MLX's `models.list()` (or public models endpoint) — never a hardcoded/curated list baked into the tool. If the fetch fails (offline, bad key, local server not running) the command prints an empty result instead of erroring; check connectivity/credentials, or pull a model directly with `ollama pull <model>`.
+Model lists are always fetched live from the provider — Ollama's `/api/tags`, OpenAI/Anthropic/Gemini/OpenRouter/DeepSeek/llama.cpp/MLX's `models.list()` (or public models endpoint) — never a hardcoded/curated list baked into the tool. If the fetch fails (offline, bad key, local server not running) the command prints an empty result instead of erroring; check connectivity/credentials, or pull a model directly with `ollama pull <model>`.
