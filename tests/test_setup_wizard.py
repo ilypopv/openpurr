@@ -7,15 +7,25 @@ those three functions and asserting on the config that gets written.
 
 from __future__ import annotations
 
+from itertools import repeat
 from unittest.mock import patch
 
 from openpurr import setup_wizard
 
 
-def _run_with_answers(select_answers, text_answers, password_answers=None, models=None):
+def _run_with_answers(
+    select_answers,
+    text_answers,
+    password_answers=None,
+    models=None,
+    validation_errors=None,
+):
     select_iter = iter(select_answers)
     text_iter = iter(text_answers)
     password_iter = iter(password_answers or [])
+    validation_iter = (
+        iter(validation_errors) if validation_errors is not None else repeat(None)
+    )
 
     written: dict = {}
 
@@ -33,6 +43,11 @@ def _run_with_answers(select_answers, text_answers, password_answers=None, model
             setup_wizard, "_password", side_effect=lambda *a, **k: next(password_iter)
         ),
         patch.object(setup_wizard, "write_config", side_effect=fake_write_config),
+        patch.object(
+            setup_wizard,
+            "_validate_model",
+            side_effect=lambda *a, **k: next(validation_iter),
+        ),
         patch(
             "openpurr.model_catalog.list_models",
             return_value=models if models is not None else [],
@@ -101,6 +116,28 @@ class TestCloudProviderFlow:
         assert written["OPO_API_KEY"] == "gm-test"
         assert written["OPO_MODEL"] == "gemini-2.0-flash"
 
+    def test_invalid_model_prompts_retry_and_picks_next(self):
+        ok, written = _run_with_answers(
+            select_answers=["gemini", "gemini-2.5-flash", "retry", "gemini-3.6-flash"],
+            text_answers=["", "main"],
+            password_answers=["gm-test"],
+            models=["gemini-2.5-flash", "gemini-3.6-flash"],
+            validation_errors=["model not found", None],
+        )
+        assert ok is True
+        assert written["OPO_MODEL"] == "gemini-3.6-flash"
+
+    def test_invalid_model_can_be_saved_anyway(self):
+        ok, written = _run_with_answers(
+            select_answers=["gemini", "gemini-2.5-flash", "skip"],
+            text_answers=["", "main"],
+            password_answers=["gm-test"],
+            models=["gemini-2.5-flash"],
+            validation_errors=["model not found"],
+        )
+        assert ok is True
+        assert written["OPO_MODEL"] == "gemini-2.5-flash"
+
     def test_blank_api_key_aborts_setup(self):
         ok, written = _run_with_answers(
             select_answers=["openai"],
@@ -119,6 +156,26 @@ class TestCloudProviderFlow:
         )
         assert ok is True
         assert written["OPO_HOST"] == "https://my-proxy.example.com"
+
+
+class TestValidateModel:
+    def test_returns_none_on_successful_call(self):
+        with patch.object(setup_wizard, "build_provider") as mock_build:
+            mock_build.return_value.generate.return_value = "pong"
+            error = setup_wizard._validate_model(
+                "gemini", "gemini-3.6-flash", {"OPO_API_KEY": "k"}
+            )
+        assert error is None
+
+    def test_returns_error_text_on_failure(self):
+        with patch.object(setup_wizard, "build_provider") as mock_build:
+            mock_build.return_value.generate.side_effect = RuntimeError(
+                "model not found"
+            )
+            error = setup_wizard._validate_model(
+                "gemini", "gemini-2.5-flash", {"OPO_API_KEY": "k"}
+            )
+        assert error == "model not found"
 
 
 class TestLocalServerFlow:
