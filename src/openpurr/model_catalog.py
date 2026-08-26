@@ -36,7 +36,7 @@ def _list_ollama(host: str | None) -> list[str]:
         r = httpx.get(f"{base.rstrip('/')}/api/tags", timeout=5.0)
         r.raise_for_status()
         return [m["name"] for m in r.json().get("models", [])]
-    except Exception:
+    except Exception:  # noqa: BLE001 - never block callers on a flaky provider
         return []
 
 
@@ -47,7 +47,7 @@ def _list_openai_compatible(provider: str, api_key: str, host: str | None) -> li
         base_url = resolve_base_url(provider, host)
         client = OpenAI(api_key=api_key or "not-needed", base_url=base_url)
         models = list(client.models.list())
-    except Exception:
+    except Exception:  # noqa: BLE001 - never block callers on a flaky provider
         return []
 
     models.sort(key=lambda m: getattr(m, "created", 0) or 0, reverse=True)
@@ -65,7 +65,7 @@ def _list_anthropic(api_key: str) -> list[str]:
 
         client = anthropic.Anthropic(api_key=api_key)
         models = list(client.models.list())
-    except Exception:
+    except Exception:  # noqa: BLE001 - never block callers on a flaky provider
         return []
 
     models.sort(key=lambda m: getattr(m, "created_at", None) or "", reverse=True)
@@ -77,7 +77,7 @@ def _list_openrouter() -> list[str]:
         r = httpx.get(f"{PROVIDER_BASE_URLS['openrouter']}/models", timeout=5.0)
         r.raise_for_status()
         entries = r.json().get("data", [])
-    except Exception:
+    except Exception:  # noqa: BLE001 - never block callers on a flaky provider
         return []
 
     entries.sort(key=lambda m: m.get("created", 0) or 0, reverse=True)
