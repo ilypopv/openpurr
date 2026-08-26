@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from openpurr.config import PROVIDER_BASE_URLS, Config
+from openpurr.config import Config, resolve_base_url
 from openpurr.providers.base import BaseLLMProvider
 from openpurr.providers.ollama import OllamaProvider
 
@@ -20,10 +20,7 @@ def build_provider(config: Config) -> BaseLLMProvider:
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         from openpurr.providers.openai import OpenAICompatibleProvider
 
-        base_url: str | None = (
-            config.llm_host if config.llm_host != "http://localhost:11434" else None
-        )
-        base_url = base_url or PROVIDER_BASE_URLS.get(provider)
+        base_url = resolve_base_url(provider, config.llm_host)
         return OpenAICompatibleProvider(
             api_key=config.llm_api_key,
             model=config.llm_model,
