@@ -6,10 +6,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from openpurr import model_catalog
 from openpurr import pr as pr_module
 from openpurr.config import (
     CONFIG_DESCRIPTIONS,
-    KNOWN_MODELS,
     SHORT_KEY_MAP,
     Config,
     get_config_value,
@@ -111,39 +111,21 @@ def models(
     cfg = _config()
     target = provider or cfg.llm_provider
 
-    if target == "ollama":
-        try:
-            import httpx
+    names = model_catalog.list_models(
+        target, api_key=cfg.llm_api_key, host=cfg.llm_host
+    )
+    if not names:
+        console.print(
+            f"[yellow]No models found for '{target}'. "
+            "Check connectivity/API key, or set one directly with:[/yellow] "
+            "[bold cyan]opo config set model <name>[/bold cyan]"
+        )
+        return
 
-            host = cfg.llm_host
-            r = httpx.get(f"{host.rstrip('/')}/api/tags", timeout=5.0)
-            r.raise_for_status()
-            names = [m["name"] for m in r.json().get("models", [])]
-        except Exception as exc:
-            console.print(f"[red]Could not reach Ollama at {cfg.llm_host}: {exc}[/red]")
-            raise SystemExit(1)
-        if not names:
-            console.print(
-                "[yellow]No models found. Pull one with: ollama pull <model>[/yellow]"
-            )
-            return
-        console.print(f"[bold]Ollama models on {cfg.llm_host}:[/bold]")
-        for name in names:
-            marker = "[bold cyan]*[/bold cyan] " if name == cfg.llm_model else "  "
-            console.print(f"{marker}{name}")
-    else:
-        known = KNOWN_MODELS.get(target, [])
-        if not known:
-            console.print(
-                f"[yellow]No known model list for '{target}'. "
-                "Set the model directly with:[/yellow] "
-                f"[bold cyan]opo config set llm.model <name>[/bold cyan]"
-            )
-            return
-        console.print(f"[bold]Known models for {target}:[/bold]")
-        for name in known:
-            marker = "[bold cyan]*[/bold cyan] " if name == cfg.llm_model else "  "
-            console.print(f"{marker}{name}")
+    console.print(f"[bold]Models available for {target}:[/bold]")
+    for name in names:
+        marker = "[bold cyan]*[/bold cyan] " if name == cfg.llm_model else "  "
+        console.print(f"{marker}{name}")
 
 
 # ─── opo config describe ─────────────────────────────────────────────────────
@@ -161,9 +143,8 @@ def config_describe() -> None:
     table.add_column("Description")
 
     for short_key, description in CONFIG_DESCRIPTIONS.items():
-        dotted_key = SHORT_KEY_MAP[short_key]
-        section, field = dotted_key.split(".", 1)
-        value = str(data.get(section, {}).get(field, ""))
+        env_key = SHORT_KEY_MAP[short_key]
+        value = str(data.get(env_key, ""))
         if short_key == "api_key" and value:
             value = value[:4] + "…" + value[-4:] if len(value) > 8 else "****"
         table.add_row(short_key, value, description)
@@ -176,13 +157,13 @@ def config_describe() -> None:
 
 @config_app.command("get")
 def config_get(
-    key: str = typer.Argument(..., help="Dotted config key, e.g. llm.model"),
+    key: str = typer.Argument(..., help="Config key, e.g. model"),
 ) -> None:
     """Print the current value of a configuration key."""
     try:
         value = get_config_value(key)
         console.print(str(value))
-    except (KeyError, ValueError) as exc:
+    except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise SystemExit(1)
 
@@ -192,14 +173,14 @@ def config_get(
 
 @config_app.command("set")
 def config_set(
-    key: str = typer.Argument(..., help="Dotted config key, e.g. llm.model"),
+    key: str = typer.Argument(..., help="Config key, e.g. model"),
     value: str = typer.Argument(..., help="New value to set"),
 ) -> None:
     """Update a configuration key in ~/.openpurr."""
     try:
         set_config_value(key, value)
         console.print(f"[green]Set[/green] [bold]{key}[/bold] = {value}")
-    except (ValueError, Exception) as exc:
+    except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise SystemExit(1)
 
