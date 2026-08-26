@@ -129,7 +129,9 @@ class Config:
 
     @property
     def llm_temperature(self) -> float:
-        return float(self._data.get("OPO_TEMPERATURE", DEFAULT_CONFIG["OPO_TEMPERATURE"]))
+        return float(
+            self._data.get("OPO_TEMPERATURE", DEFAULT_CONFIG["OPO_TEMPERATURE"])
+        )
 
     @property
     def llm_keep_alive(self) -> str:
