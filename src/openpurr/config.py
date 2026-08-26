@@ -1,7 +1,10 @@
 """Configuration loader and writer for openpurr (~/.openpurr).
 
 Storage format is flat `OPO_KEY=value` lines (no sections, no quoting) —
-mirrors opencommit's `~/.opencommit` rather than TOML.
+mirrors opencommit's `~/.opencommit` rather than TOML. Everything after a
+line containing only `---` is a free-text area for custom system prompt
+overrides (see `PROMPT_HEADERS`), kept out of the `OPO_KEY=value` parsing
+entirely so prompt text can contain `=`, brackets, anything.
 """
 
 from __future__ import annotations
@@ -42,6 +45,14 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "base": "Default base branch to diff against (main, master, …)",
 }
 
+PROMPT_DELIMITER = "---"
+
+# Free-text section headers (case-insensitive) → the Config property key they fill.
+PROMPT_HEADERS: dict[str, str] = {
+    "INIT PROMPT:": "init",
+    "REVIEW PROMPT:": "review",
+}
+
 PROVIDER_BASE_URLS: dict[str, str] = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "openrouter": "https://openrouter.ai/api/v1",
@@ -77,14 +88,60 @@ def _render_env(data: dict[str, str]) -> str:
     return "\n".join(f"{key}={value}" for key, value in data.items()) + "\n"
 
 
+def _split_config_text(text: str) -> tuple[str, str]:
+    """Split raw file text at the `---` delimiter: (KEY=value part, prompt part)."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == PROMPT_DELIMITER:
+            return "\n".join(lines[:i]), "\n".join(lines[i + 1 :])
+    return "\n".join(lines), ""
+
+
+def _parse_prompts(text: str) -> dict[str, str]:
+    """Parse `INIT PROMPT:` / `REVIEW PROMPT:` sections from the free-text part."""
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        key = PROMPT_HEADERS.get(line.strip().upper())
+        if key is not None:
+            current = key
+            sections[current] = []
+            continue
+        if current is not None:
+            sections[current].append(line)
+    return {key: "\n".join(lines).strip() for key, lines in sections.items()}
+
+
+def _render_prompts(prompts: dict[str, str]) -> str:
+    headers = {v: k for k, v in PROMPT_HEADERS.items()}
+    parts = [PROMPT_DELIMITER]
+    for key in ("init", "review"):
+        if prompts.get(key):
+            parts.extend([headers[key], prompts[key], ""])
+    return "\n".join(parts).rstrip() + "\n"
+
+
 def write_config(data: dict[str, str]) -> None:
-    CONFIG_PATH.write_text(_render_env(data))
+    text = _render_env(data)
+    prompts = load_prompts()
+    if prompts:
+        text = text.rstrip("\n") + "\n\n" + _render_prompts(prompts)
+    CONFIG_PATH.write_text(text)
 
 
 def load_config() -> dict[str, str]:
     if not CONFIG_PATH.exists():
         return dict(DEFAULT_CONFIG)
-    return {**DEFAULT_CONFIG, **_parse_env(CONFIG_PATH.read_text())}
+    flat_text, _ = _split_config_text(CONFIG_PATH.read_text())
+    return {**DEFAULT_CONFIG, **_parse_env(flat_text)}
+
+
+def load_prompts() -> dict[str, str]:
+    """Custom system prompt overrides from the `---`-delimited section, if any."""
+    if not CONFIG_PATH.exists():
+        return {}
+    _, prompt_text = _split_config_text(CONFIG_PATH.read_text())
+    return _parse_prompts(prompt_text)
 
 
 def _resolve_key(key: str) -> str:
@@ -109,8 +166,19 @@ def get_config_value(key: str) -> Any:
 
 
 class Config:
-    def __init__(self, data: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        data: dict[str, str] | None = None,
+        prompts: dict[str, str] | None = None,
+    ) -> None:
         self._data = data if data is not None else load_config()
+        if prompts is not None:
+            self._prompts = prompts
+        else:
+            # Only auto-load from disk alongside auto-loaded data — an explicit
+            # `data` dict (tests, one-off trial configs) must never touch the
+            # filesystem unless prompts are explicitly passed too.
+            self._prompts = load_prompts() if data is None else {}
 
     @property
     def llm_provider(self) -> str:
@@ -141,3 +209,11 @@ class Config:
     @property
     def pr_default_base(self) -> str:
         return self._data.get("OPO_BASE", DEFAULT_CONFIG["OPO_BASE"])
+
+    @property
+    def custom_init_prompt(self) -> str:
+        return self._prompts.get("init", "")
+
+    @property
+    def custom_review_prompt(self) -> str:
+        return self._prompts.get("review", "")
