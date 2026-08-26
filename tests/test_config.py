@@ -8,10 +8,13 @@ from openpurr.config import (
     DEFAULT_CONFIG,
     Config,
     _parse_env,
+    _parse_prompts,
     _render_env,
+    _split_config_text,
     get_config_value,
     is_first_run,
     load_config,
+    load_prompts,
     resolve_base_url,
     set_config_value,
     write_config,
@@ -138,6 +141,91 @@ class TestWriteConfig:
         assert "[" not in content
 
 
+# ─── custom prompt overrides ────────────────────────────────────────────────────
+
+
+class TestSplitConfigText:
+    def test_no_delimiter_is_all_flat(self):
+        flat, prompt = _split_config_text("OPO_PROVIDER=ollama\n")
+        assert flat == "OPO_PROVIDER=ollama"
+        assert prompt == ""
+
+    def test_splits_on_delimiter_line(self):
+        flat, prompt = _split_config_text(
+            "OPO_PROVIDER=ollama\n---\nINIT PROMPT:\nHello\n"
+        )
+        assert flat == "OPO_PROVIDER=ollama"
+        assert prompt == "INIT PROMPT:\nHello"
+
+
+class TestParsePrompts:
+    def test_parses_single_section(self):
+        assert _parse_prompts("INIT PROMPT:\nLine one\nLine two") == {
+            "init": "Line one\nLine two"
+        }
+
+    def test_parses_both_sections(self):
+        prompts = _parse_prompts(
+            "INIT PROMPT:\nCustom init\n\nREVIEW PROMPT:\nCustom review"
+        )
+        assert prompts == {"init": "Custom init", "review": "Custom review"}
+
+    def test_header_matching_is_case_insensitive(self):
+        assert _parse_prompts("init prompt:\nhi") == {"init": "hi"}
+
+    def test_no_headers_returns_empty(self):
+        assert _parse_prompts("just some text\nno headers here") == {}
+
+
+class TestLoadPrompts:
+    def test_returns_empty_when_no_file(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
+        assert load_prompts() == {}
+
+    def test_returns_empty_when_no_delimiter(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text("OPO_PROVIDER=ollama\n")
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        assert load_prompts() == {}
+
+    def test_reads_custom_prompts(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text(
+            "OPO_PROVIDER=ollama\nOPO_MODEL=gemma4:26b\n"
+            "\n---\nINIT PROMPT:\nBe extra terse.\n"
+        )
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        assert load_prompts() == {"init": "Be extra terse."}
+
+    def test_flat_config_unaffected_by_prompt_section(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text(
+            "OPO_PROVIDER=ollama\n---\nINIT PROMPT:\nOPO_FAKE=should not parse\n"
+        )
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        assert "OPO_FAKE" not in load_config()
+
+
+class TestWriteConfigPreservesPrompts:
+    def test_write_config_keeps_existing_prompt_section(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text("OPO_PROVIDER=ollama\n\n---\nINIT PROMPT:\nMy custom prompt.\n")
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        data = dict(DEFAULT_CONFIG)
+        data["OPO_PROVIDER"] = "openai"
+        write_config(data)
+        assert load_config()["OPO_PROVIDER"] == "openai"
+        assert load_prompts() == {"init": "My custom prompt."}
+
+    def test_write_config_writes_no_prompt_section_when_none_exists(
+        self, monkeypatch, tmp_path
+    ):
+        p = tmp_path / ".openpurr"
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        write_config(DEFAULT_CONFIG)
+        assert "---" not in p.read_text()
+
+
 # ─── set_config_value ──────────────────────────────────────────────────────────
 
 
@@ -250,3 +338,20 @@ class TestConfigClass:
         monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
         cfg = Config()
         assert cfg.llm_model == ""
+
+    def test_custom_prompts_default_to_empty_string(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
+        cfg = Config()
+        assert cfg.custom_init_prompt == ""
+        assert cfg.custom_review_prompt == ""
+
+    def test_custom_prompts_read_from_file(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text(
+            "OPO_PROVIDER=ollama\n"
+            "\n---\nINIT PROMPT:\nInit override.\n\nREVIEW PROMPT:\nReview override.\n"
+        )
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        cfg = Config()
+        assert cfg.custom_init_prompt == "Init override."
+        assert cfg.custom_review_prompt == "Review override."
