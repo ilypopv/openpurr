@@ -89,6 +89,18 @@ class TestCloudProviderFlow:
         assert written["OPO_API_KEY"] == "sk-test"
         assert written["OPO_MODEL"] == "gpt-5"
 
+    def test_gemini_flow_requires_api_key_and_fetches_model(self):
+        ok, written = _run_with_answers(
+            select_answers=["gemini", "gemini-2.0-flash"],
+            text_answers=["", "main"],
+            password_answers=["gm-test"],
+            models=["gemini-2.0-flash", "gemini-2.0-pro"],
+        )
+        assert ok is True
+        assert written["OPO_PROVIDER"] == "gemini"
+        assert written["OPO_API_KEY"] == "gm-test"
+        assert written["OPO_MODEL"] == "gemini-2.0-flash"
+
     def test_blank_api_key_aborts_setup(self):
         ok, written = _run_with_answers(
             select_answers=["openai"],
