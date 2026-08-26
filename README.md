@@ -4,6 +4,8 @@
 
 CLI tool that generates PR titles, descriptions, and post-review change summaries using a local or cloud LLM. Supports Ollama, OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, llama.cpp, and MLX.
 
+Built primarily for local-first use — pair it with [Ollama](https://ollama.com) and a Gemma model (Google's Gemma family is currently the best fit for this kind of task at a size you can run locally) for a free, fully offline workflow. On Apple Silicon Macs, prefer the `-mlx` tagged variant of your chosen model (e.g. `gemma4:26b-mlx`) — it runs on Apple's MLX framework instead of plain GGUF and is noticeably faster on that hardware. Don't want to run anything locally? Google's Gemini API has a generous free tier and is a great low-friction cloud option.
+
 <br clear="left" />
 
 <br clear="left" />
@@ -46,7 +48,7 @@ Settings are stored in `~/.openpurr` as flat `OPO_KEY=value` lines — no sectio
 
 ```text
 OPO_PROVIDER=ollama
-OPO_MODEL=gemma4:26b-mlx
+OPO_MODEL=gemma4:26b
 OPO_API_KEY=
 OPO_HOST=http://localhost:11434
 OPO_TEMPERATURE=0.0
@@ -64,8 +66,8 @@ opo config describe
 opo config get model
 
 # Update a value
-opo config set provider openai
-opo config set model gpt-4o-mini
+opo config set provider ollama
+opo config set model gemma4:26b
 opo config set api_key sk-...
 opo config set keep_alive 0s
 ```
@@ -84,13 +86,15 @@ opo config set keep_alive 0s
 
 There's no hardcoded default model: `opo setup` always has you pick one (from a live-fetched list, or typed manually), and `opo`/`opo review` will error out with a pointer back to `opo setup` if `model` is ever left blank (e.g. after hand-editing the file).
 
-### Example: switch to OpenAI
+### Example: switch to Google Gemini (free tier)
 
 ```bash
-opo config set provider openai
-opo config set model gpt-4o-mini
-opo config set api_key sk-...
+opo config set provider gemini
+opo config set model <your-chosen-model>
+opo config set api_key <your-gemini-api-key>
 ```
+
+Model names aren't hardcoded anywhere in this README on purpose — providers retire and rename models constantly. Run `opo setup` or `opo models --provider gemini` to pick from what's actually available right now.
 
 ### Example: unload Ollama from VRAM after each request
 
