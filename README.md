@@ -10,6 +10,8 @@ Built primarily for local-first use — pair it with [Ollama](https://ollama.com
 
 <br clear="left" />
 
+Built primarily for local-first use — pair it with [Ollama](https://ollama.com) and a Gemma model (Google's Gemma family is currently the best fit for this kind of task at a size you can run locally) for a free, fully offline workflow. On Apple Silicon Macs, prefer the `-mlx` tagged variant of your chosen model (e.g. `gemma4:26b-mlx`) — it runs on Apple's MLX framework instead of plain GGUF and is noticeably faster on that hardware. Don't want to run anything locally? Google's Gemini API has a generous free tier and is a great low-friction cloud option.
+
 ## Installation
 
 ```bash
