@@ -20,7 +20,9 @@ from openpurr import model_catalog
 class TestListModelsOllama:
     def test_parses_tags_response(self):
         resp = MagicMock()
-        resp.json.return_value = {"models": [{"name": "llama3:8b"}, {"name": "gemma:2b"}]}
+        resp.json.return_value = {
+            "models": [{"name": "llama3:8b"}, {"name": "gemma:2b"}]
+        }
         resp.raise_for_status = MagicMock()
         with patch("openpurr.model_catalog.httpx.get", return_value=resp) as mock_get:
             names = model_catalog.list_models("ollama", host="http://localhost:11434")
@@ -33,7 +35,9 @@ class TestListModelsOllama:
             "openpurr.model_catalog.httpx.get",
             side_effect=httpx.ConnectError("refused"),
         ):
-            assert model_catalog.list_models("ollama", host="http://localhost:11434") == []
+            assert (
+                model_catalog.list_models("ollama", host="http://localhost:11434") == []
+            )
 
     def test_defaults_host_when_none(self):
         resp = MagicMock()
