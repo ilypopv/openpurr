@@ -11,8 +11,10 @@ from openpurr.config import (
     CONFIG_PATH,
     DEFAULT_CONFIG,
     PROVIDER_BASE_URLS,
+    Config,
     write_config,
 )
+from openpurr.llm import build_provider
 
 console = Console()
 
@@ -85,6 +87,47 @@ def _pick_model(models: list[str], default_text: str = "") -> str:
     return chosen
 
 
+def _validate_model(provider: str, model: str, partial: dict[str, str]) -> str | None:
+    """Try one real, minimal request against `model`. None on success, else the error text.
+
+    No provider's model-list endpoint reliably marks a model as still usable —
+    OpenAI/Anthropic expose no deprecation flag, and Gemini's "no longer
+    available to new users" restriction only surfaces at request time. Actually
+    calling the model is the only trustworthy check.
+    """
+    trial = build_provider(
+        Config({**partial, "OPO_PROVIDER": provider, "OPO_MODEL": model})
+    )
+    try:
+        trial.generate(prompt="ping", system_prompt="Reply with: pong", temperature=0.0)
+    except Exception as exc:  # noqa: BLE001 - any provider failure means the model isn't usable
+        return str(exc)
+    return None
+
+
+def _pick_and_validate_model(
+    provider: str, models: list[str], partial: dict[str, str], default_text: str = ""
+) -> str:
+    remaining = list(models)
+    while True:
+        model = _pick_model(remaining, default_text=default_text)
+        console.print(f"[dim]Verifying {model} works…[/dim]")
+        error = _validate_model(provider, model, partial)
+        if error is None:
+            return model
+        console.print(f"[red]{model} isn't usable: {error}[/red]")
+        choice = _select(
+            "What would you like to do?",
+            choices=[
+                questionary.Choice("Pick a different model", value="retry"),
+                questionary.Choice("Save anyway (skip verification)", value="skip"),
+            ],
+        )
+        if choice == "skip":
+            return model
+        remaining = [m for m in remaining if m != model]
+
+
 def _run_setup_flow() -> dict[str, str]:
     data = dict(DEFAULT_CONFIG)
 
@@ -136,7 +179,7 @@ def _run_setup_flow() -> dict[str, str]:
         models = model_catalog.list_models(
             provider, api_key=data["OPO_API_KEY"], host=data.get("OPO_HOST")
         )
-        data["OPO_MODEL"] = _pick_model(models)
+        data["OPO_MODEL"] = _pick_and_validate_model(provider, models, data)
 
         custom_url = _text(
             "Custom base URL (leave blank to use provider default)", default=""
