@@ -33,7 +33,7 @@ SHORT_KEY_MAP: dict[str, str] = {
 }
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
-    "provider": "LLM provider — ollama | openai | anthropic | openrouter | deepseek | llamacpp | mlx",
+    "provider": "LLM provider — ollama | openai | anthropic | gemini | openrouter | deepseek | llamacpp | mlx",
     "model": "Model name (fetched live per-provider via `opo models`)",
     "api_key": "API key for cloud providers (not required for ollama / llamacpp / mlx)",
     "host": "Base URL — Ollama default is http://localhost:11434; custom endpoint for other providers",
@@ -43,6 +43,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
 }
 
 PROVIDER_BASE_URLS: dict[str, str] = {
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "openrouter": "https://openrouter.ai/api/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "llamacpp": "http://localhost:8080/v1",

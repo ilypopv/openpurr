@@ -20,6 +20,7 @@ PROVIDERS = [
     ("ollama", "Ollama (Free, runs locally)"),
     ("openai", "OpenAI (GPT models)"),
     ("anthropic", "Anthropic (Claude models)"),
+    ("gemini", "Google (Gemini models)"),
     ("openrouter", "OpenRouter (Multiple providers)"),
     ("deepseek", "DeepSeek"),
     ("llamacpp", "llama.cpp (Free, runs locally)"),

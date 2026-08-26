@@ -47,7 +47,9 @@ class TestProviderRouting:
         )
         assert isinstance(p, AnthropicProvider)
 
-    @pytest.mark.parametrize("provider", ["openrouter", "deepseek", "llamacpp", "mlx"])
+    @pytest.mark.parametrize(
+        "provider", ["gemini", "openrouter", "deepseek", "llamacpp", "mlx"]
+    )
     def test_all_openai_compatible_providers(self, provider):
         p = build_provider(_cfg(**{"llm.provider": provider, "llm.api_key": "k"}))
         assert isinstance(p, OpenAICompatibleProvider)
@@ -66,6 +68,10 @@ class TestBaseUrl:
             _cfg(**{"llm.provider": "ollama", "llm.host": "http://custom:11434"})
         )
         assert p.host == "http://custom:11434"
+
+    def test_gemini_gets_provider_base_url(self):
+        p = build_provider(_cfg(**{"llm.provider": "gemini", "llm.api_key": "k"}))
+        assert p._base_url == PROVIDER_BASE_URLS["gemini"]
 
     def test_openrouter_gets_provider_base_url(self):
         p = build_provider(_cfg(**{"llm.provider": "openrouter", "llm.api_key": "k"}))

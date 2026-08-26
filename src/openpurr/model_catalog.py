@@ -52,7 +52,7 @@ def _list_openai_compatible(provider: str, api_key: str, host: str | None) -> li
 
     models.sort(key=lambda m: getattr(m, "created", 0) or 0, reverse=True)
     names = [m.id for m in models]
-    if provider == "openai":
+    if provider in ("openai", "gemini"):
         names = [
             n for n in names if not any(bad in n.lower() for bad in _NON_CHAT_DENYLIST)
         ]
@@ -92,6 +92,6 @@ def list_models(provider: str, api_key: str = "", host: str | None = None) -> li
         return _list_anthropic(api_key)
     if provider == "openrouter":
         return _list_openrouter()
-    if provider in ("openai", "deepseek", "llamacpp", "mlx"):
+    if provider in ("openai", "gemini", "deepseek", "llamacpp", "mlx"):
         return _list_openai_compatible(provider, api_key, host)
     return []
