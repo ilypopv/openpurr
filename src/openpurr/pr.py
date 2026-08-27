@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from openpurr.config import Config
+from openpurr.config import Config, language_name
 from openpurr.llm import build_provider
 from openpurr.utils import git
 
 console = Console()
 
-INIT_SYSTEM_PROMPT = """\
+
+def _init_system_prompt(language: str) -> str:
+    return f"""\
 You are a Senior Principal Engineer. Based on the provided git diff, generate a Pull Request Title and Description.
 
 CRITICAL RULES:
-1. Language: English ONLY.
+1. Language: Write entirely in {language_name(language)}.
 2. Title MUST strictly follow Conventional Commits (e.g., feat(auth): add JWT refresh endpoint).
 3. Description MUST strictly follow this Markdown structure:
 
@@ -31,16 +33,25 @@ CRITICAL RULES:
 - [Testing details derived from diff or code]
 """
 
-REVIEW_SYSTEM_PROMPT = """\
+
+def _review_system_prompt(language: str) -> str:
+    return f"""\
 You are a Senior Principal Engineer. Based on the git diff of changes made during code review, write a concise summary for the reviewer.
 
 CRITICAL RULES:
-1. Language: English ONLY.
+1. Language: Write entirely in {language_name(language)}.
 2. Follow this structure strictly:
 
 ## 🔄 Changes since last review
 - [Bullet points describing fixes and requested updates]
 """
+
+
+# Default (English) renderings — kept as module-level constants so callers that
+# want the built-in prompt without a Config instance (e.g. tests) still have a
+# stable name to import; actual generation always resolves via config.llm_language.
+INIT_SYSTEM_PROMPT = _init_system_prompt("en")
+REVIEW_SYSTEM_PROMPT = _review_system_prompt("en")
 
 
 def _require_model(config: Config) -> None:
@@ -76,7 +87,8 @@ def run_init(base: str | None, config: Config) -> None:
     ):
         output = provider.generate(
             prompt=diff_result.diff,
-            system_prompt=config.custom_init_prompt or INIT_SYSTEM_PROMPT,
+            system_prompt=config.custom_init_prompt
+            or _init_system_prompt(config.llm_language),
             temperature=config.llm_temperature,
             keep_alive=config.llm_keep_alive,
         )
@@ -110,7 +122,8 @@ def run_review(commits: int, config: Config) -> None:
     with console.status("[bold green]Generating review summary...[/bold green]"):
         output = provider.generate(
             prompt=diff_result.diff,
-            system_prompt=config.custom_review_prompt or REVIEW_SYSTEM_PROMPT,
+            system_prompt=config.custom_review_prompt
+            or _review_system_prompt(config.llm_language),
             temperature=config.llm_temperature,
             keep_alive=config.llm_keep_alive,
         )
