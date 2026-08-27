@@ -90,6 +90,7 @@ OPO_HOST=http://localhost:11434
 OPO_TEMPERATURE=0.0
 OPO_KEEP_ALIVE=5m
 OPO_BASE=main
+OPO_LANGUAGE=en
 ```
 
 Use the `config` subcommand to inspect and update values without editing the file directly.
@@ -124,6 +125,7 @@ OPO_HOST=http://localhost:11434
 OPO_TEMPERATURE=0.0
 OPO_KEEP_ALIVE=5m
 OPO_BASE=main
+OPO_LANGUAGE=en
 
 ---
 INIT PROMPT:
@@ -136,7 +138,9 @@ Summarize what changed since the last review in one short paragraph.
 
 `opo config set`/`opo config describe` only ever touch the `OPO_KEY=value` part above the
 `---` line — the prompt section is left exactly as you wrote it, and `opo config describe`
-tells you which of `init`/`review` are currently overridden.
+tells you which of `init`/`review` are currently overridden. Note that `OPO_LANGUAGE` (see
+below) only affects the *built-in* prompts — once you write your own `INIT PROMPT:`/`REVIEW PROMPT:`,
+you're in full control, so specify the language directly in the prompt text if you need one.
 
 ### Configuration keys
 
@@ -149,6 +153,7 @@ tells you which of `init`/`review` are currently overridden.
 | `temperature` | `OPO_TEMPERATURE` | `0.0` | Sampling temperature (`0.0` = deterministic) |
 | `keep_alive` | `OPO_KEEP_ALIVE` | `5m` | Ollama VRAM keep-alive (`0s` = unload immediately, `5m` = keep warm) |
 | `base` | `OPO_BASE` | `main` | Default base branch to diff against |
+| `language` | `OPO_LANGUAGE` | `en` | Output language for generated PR text (ISO 639-1 code, e.g. `es`, `fr`, `de`, `ja`, `zh`) |
 
 There's no hardcoded default model: `opo setup` always has you pick one (from a live-fetched list, or typed manually), and `opo`/`opo review` will error out with a pointer back to `opo setup` if `model` is ever left blank (e.g. after hand-editing the file).
 
@@ -167,6 +172,16 @@ Model names aren't hardcoded anywhere in this README on purpose — providers re
 ```bash
 opo config set keep_alive 0s
 ```
+
+### Example: generate PR text in another language
+
+```bash
+opo config set language es
+```
+
+`opo setup` also asks for this up front, with arrow-key selection from common languages
+plus a custom-code fallback. This only affects the built-in prompts — see
+[Custom system prompts](#custom-system-prompts) above.
 
 ## Models
 
