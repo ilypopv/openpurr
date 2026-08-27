@@ -13,6 +13,7 @@ from openpurr.config import (
     _split_config_text,
     get_config_value,
     is_first_run,
+    language_name,
     load_config,
     load_prompts,
     resolve_base_url,
@@ -306,6 +307,20 @@ class TestResolveBaseUrl:
         assert resolve_base_url("openai", None) is None
 
 
+# ─── language_name ─────────────────────────────────────────────────────────────
+
+
+class TestLanguageName:
+    def test_known_code_returns_name(self):
+        assert language_name("es") == "Spanish"
+
+    def test_matching_is_case_and_whitespace_insensitive(self):
+        assert language_name(" EN ") == "English"
+
+    def test_unknown_code_passes_through(self):
+        assert language_name("pt-br") == "pt-br"
+
+
 # ─── Config class ──────────────────────────────────────────────────────────────
 
 
@@ -355,3 +370,15 @@ class TestConfigClass:
         cfg = Config()
         assert cfg.custom_init_prompt == "Init override."
         assert cfg.custom_review_prompt == "Review override."
+
+    def test_language_defaults_to_en(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", tmp_path / "missing")
+        cfg = Config()
+        assert cfg.llm_language == "en"
+
+    def test_language_read_from_file(self, monkeypatch, tmp_path):
+        p = tmp_path / ".openpurr"
+        p.write_text("OPO_PROVIDER=ollama\nOPO_LANGUAGE=es\n")
+        monkeypatch.setattr("openpurr.config.CONFIG_PATH", p)
+        cfg = Config()
+        assert cfg.llm_language == "es"
