@@ -22,6 +22,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "OPO_TEMPERATURE": "0.0",
     "OPO_KEEP_ALIVE": "5m",
     "OPO_BASE": "main",
+    "OPO_LANGUAGE": "en",
 }
 
 # Short CLI keys → OPO_* env keys
@@ -33,6 +34,7 @@ SHORT_KEY_MAP: dict[str, str] = {
     "temperature": "OPO_TEMPERATURE",
     "keep_alive": "OPO_KEEP_ALIVE",
     "base": "OPO_BASE",
+    "language": "OPO_LANGUAGE",
 }
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
@@ -43,7 +45,40 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "temperature": "Sampling temperature: 0.0 = deterministic",
     "keep_alive": "Ollama VRAM keep-alive duration — 0s = unload immediately, 5m = keep 5 min",
     "base": "Default base branch to diff against (main, master, …)",
+    "language": "Output language for generated PR text (ISO 639-1 code, e.g. en, ru, es, fr, de, ja, zh)",
 }
+
+# ISO 639-1 code → English name, used to phrase the language instruction in the
+# default system prompts. Not exhaustive — unknown codes pass through as-is,
+# so any code the LLM understands works even if it isn't listed here.
+LANGUAGES: dict[str, str] = {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "uk": "Ukrainian",
+    "pl": "Polish",
+    "nl": "Dutch",
+    "tr": "Turkish",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "ar": "Arabic",
+    "hi": "Hindi",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "cs": "Czech",
+    "sv": "Swedish",
+}
+
+
+def language_name(code: str) -> str:
+    """Human-readable language name for a prompt instruction; unknown codes pass through as-is."""
+    return LANGUAGES.get(code.strip().lower(), code)
+
 
 PROMPT_DELIMITER = "---"
 
@@ -209,6 +244,10 @@ class Config:
     @property
     def pr_default_base(self) -> str:
         return self._data.get("OPO_BASE", DEFAULT_CONFIG["OPO_BASE"])
+
+    @property
+    def llm_language(self) -> str:
+        return self._data.get("OPO_LANGUAGE", DEFAULT_CONFIG["OPO_LANGUAGE"])
 
     @property
     def custom_init_prompt(self) -> str:
