@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from rich.console import Console
 
 from openpurr.config import Config, language_name
@@ -10,15 +12,27 @@ from openpurr.utils import git
 
 console = Console()
 
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+
+
+def _strip_thinking(text: str) -> str:
+    """Drop a leaked <think>...</think> reasoning block some models emit inline."""
+    return _THINK_BLOCK_RE.sub("", text).strip()
+
 
 def _init_system_prompt(language: str) -> str:
     return f"""\
 You are a Senior Principal Engineer. Based on the provided git diff, generate a Pull Request Title and Description.
 
 CRITICAL RULES:
-1. Language: Write entirely in {language_name(language)}.
-2. Title MUST strictly follow Conventional Commits (e.g., feat(auth): add JWT refresh endpoint).
-3. Description MUST strictly follow this Markdown structure:
+1. Output ONLY the exact template below, filled in — nothing before, after, or between its parts. No preamble, reasoning, analysis, or commentary. Do not think out loud; if you reason internally, never print that reasoning. The Title is REQUIRED and is the first line of output — it is not preamble.
+2. Language: Write entirely in {language_name(language)}.
+3. Title MUST strictly follow Conventional Commits (e.g., feat(auth): add JWT refresh endpoint).
+4. Description MUST strictly follow this Markdown structure.
+
+TEMPLATE (replace the placeholders, keep everything else verbatim):
+
+<title as plain text, Conventional Commits format>
 
 ## 📝 Summary
 [2-3 sentences summarizing the core changes]
@@ -39,8 +53,9 @@ def _review_system_prompt(language: str) -> str:
 You are a Senior Principal Engineer. Based on the git diff of changes made during code review, write a concise summary for the reviewer.
 
 CRITICAL RULES:
-1. Language: Write entirely in {language_name(language)}.
-2. Follow this structure strictly:
+1. Output ONLY the content below — no preamble, reasoning, analysis, or commentary of any kind. Do not think out loud; if you reason internally, never print that reasoning.
+2. Language: Write entirely in {language_name(language)}.
+3. Follow this structure strictly:
 
 ## 🔄 Changes since last review
 - [Bullet points describing fixes and requested updates]
@@ -94,7 +109,7 @@ def run_init(base: str | None, config: Config) -> None:
         )
 
     console.print()
-    console.print(output.strip())
+    console.print(_strip_thinking(output))
 
 
 def run_review(commits: int, config: Config) -> None:
@@ -129,4 +144,4 @@ def run_review(commits: int, config: Config) -> None:
         )
 
     console.print()
-    console.print(output.strip())
+    console.print(_strip_thinking(output))
