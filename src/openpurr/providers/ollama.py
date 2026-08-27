@@ -35,6 +35,10 @@ class OllamaProvider(BaseLLMProvider):
             "stream": stream,
             "keep_alive": keep_alive,
             "options": {"temperature": temperature},
+            # Explicitly disable extended thinking: reasoning-capable models default
+            # to emitting their chain-of-thought inline in "response" otherwise. A
+            # no-op for models without thinking support.
+            "think": False,
         }
 
     def generate(
