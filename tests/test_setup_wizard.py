@@ -61,7 +61,7 @@ def _run_with_answers(
 class TestOllamaFlow:
     def test_writes_expected_config_with_fetched_model(self):
         ok, written = _run_with_answers(
-            select_answers=["ollama", "llama3:8b"],
+            select_answers=["ollama", "llama3:8b", "en"],
             text_answers=["http://localhost:11434", "5m", "main"],
             models=["llama3:8b", "gemma:2b"],
         )
@@ -71,10 +71,11 @@ class TestOllamaFlow:
         assert written["OPO_HOST"] == "http://localhost:11434"
         assert written["OPO_KEEP_ALIVE"] == "5m"
         assert written["OPO_BASE"] == "main"
+        assert written["OPO_LANGUAGE"] == "en"
 
     def test_falls_back_to_text_entry_when_no_models_found(self):
         ok, written = _run_with_answers(
-            select_answers=["ollama"],
+            select_answers=["ollama", "en"],
             text_answers=["http://localhost:11434", "custom-model", "5m", "main"],
             models=[],
         )
@@ -83,7 +84,7 @@ class TestOllamaFlow:
 
     def test_custom_model_sentinel_falls_through_to_text(self):
         ok, written = _run_with_answers(
-            select_answers=["ollama", setup_wizard.CUSTOM_MODEL_CHOICE],
+            select_answers=["ollama", setup_wizard.CUSTOM_MODEL_CHOICE, "en"],
             text_answers=["http://localhost:11434", "hand-typed-model", "5m", "main"],
             models=["llama3:8b"],
         )
@@ -94,7 +95,7 @@ class TestOllamaFlow:
 class TestCloudProviderFlow:
     def test_openai_flow_requires_api_key_and_fetches_model(self):
         ok, written = _run_with_answers(
-            select_answers=["openai", "gpt-5"],
+            select_answers=["openai", "gpt-5", "en"],
             text_answers=["", "main"],
             password_answers=["sk-test"],
             models=["gpt-5", "gpt-5-mini"],
@@ -106,7 +107,7 @@ class TestCloudProviderFlow:
 
     def test_gemini_flow_requires_api_key_and_fetches_model(self):
         ok, written = _run_with_answers(
-            select_answers=["gemini", "gemini-2.0-flash"],
+            select_answers=["gemini", "gemini-2.0-flash", "en"],
             text_answers=["", "main"],
             password_answers=["gm-test"],
             models=["gemini-2.0-flash", "gemini-2.0-pro"],
@@ -118,7 +119,13 @@ class TestCloudProviderFlow:
 
     def test_invalid_model_prompts_retry_and_picks_next(self):
         ok, written = _run_with_answers(
-            select_answers=["gemini", "gemini-2.5-flash", "retry", "gemini-3.6-flash"],
+            select_answers=[
+                "gemini",
+                "gemini-2.5-flash",
+                "retry",
+                "gemini-3.6-flash",
+                "en",
+            ],
             text_answers=["", "main"],
             password_answers=["gm-test"],
             models=["gemini-2.5-flash", "gemini-3.6-flash"],
@@ -129,7 +136,7 @@ class TestCloudProviderFlow:
 
     def test_invalid_model_can_be_saved_anyway(self):
         ok, written = _run_with_answers(
-            select_answers=["gemini", "gemini-2.5-flash", "skip"],
+            select_answers=["gemini", "gemini-2.5-flash", "skip", "en"],
             text_answers=["", "main"],
             password_answers=["gm-test"],
             models=["gemini-2.5-flash"],
@@ -149,13 +156,46 @@ class TestCloudProviderFlow:
 
     def test_custom_base_url_overrides_provider_default(self):
         ok, written = _run_with_answers(
-            select_answers=["anthropic", "claude-x"],
+            select_answers=["anthropic", "claude-x", "en"],
             text_answers=["https://my-proxy.example.com", "main"],
             password_answers=["sk-ant"],
             models=["claude-x"],
         )
         assert ok is True
         assert written["OPO_HOST"] == "https://my-proxy.example.com"
+
+
+class TestLanguageStep:
+    def test_defaults_to_english(self):
+        ok, written = _run_with_answers(
+            select_answers=["ollama", "llama3:8b", "en"],
+            text_answers=["http://localhost:11434", "5m", "main"],
+            models=["llama3:8b"],
+        )
+        assert ok is True
+        assert written["OPO_LANGUAGE"] == "en"
+
+    def test_picks_a_listed_language(self):
+        ok, written = _run_with_answers(
+            select_answers=["ollama", "llama3:8b", "es"],
+            text_answers=["http://localhost:11434", "5m", "main"],
+            models=["llama3:8b"],
+        )
+        assert ok is True
+        assert written["OPO_LANGUAGE"] == "es"
+
+    def test_custom_language_sentinel_falls_through_to_text(self):
+        ok, written = _run_with_answers(
+            select_answers=[
+                "ollama",
+                "llama3:8b",
+                setup_wizard.CUSTOM_LANGUAGE_CHOICE,
+            ],
+            text_answers=["http://localhost:11434", "5m", "main", "pt-br"],
+            models=["llama3:8b"],
+        )
+        assert ok is True
+        assert written["OPO_LANGUAGE"] == "pt-br"
 
 
 class TestValidateModel:
@@ -181,7 +221,7 @@ class TestValidateModel:
 class TestLocalServerFlow:
     def test_llamacpp_flow_has_no_api_key(self):
         ok, written = _run_with_answers(
-            select_answers=["llamacpp", "local-model"],
+            select_answers=["llamacpp", "local-model", "en"],
             text_answers=["http://localhost:8080/v1", "main"],
             models=["local-model"],
         )
