@@ -10,6 +10,7 @@ from openpurr import model_catalog
 from openpurr.config import (
     CONFIG_PATH,
     DEFAULT_CONFIG,
+    LANGUAGES,
     PROVIDER_BASE_URLS,
     Config,
     write_config,
@@ -30,6 +31,7 @@ PROVIDERS = [
 ]
 
 CUSTOM_MODEL_CHOICE = "Enter custom model name…"
+CUSTOM_LANGUAGE_CHOICE = "Enter custom language code…"
 
 # The focused row is marked by the "»" pointer alone — no reverse-video/
 # background highlight on the row text itself. prompt_toolkit's own
@@ -84,6 +86,21 @@ def _pick_model(models: list[str], default_text: str = "") -> str:
     chosen = _select("Select a model:", choices=[*models, CUSTOM_MODEL_CHOICE])
     if chosen == CUSTOM_MODEL_CHOICE:
         return _text("Model name", default=default_text)
+    return chosen
+
+
+def _pick_language(default: str = "en") -> str:
+    choices = [
+        questionary.Choice(title=f"{name} ({code})", value=code)
+        for code, name in LANGUAGES.items()
+    ]
+    chosen = _select(
+        "Output language for generated PR text/reviews:",
+        choices=[*choices, CUSTOM_LANGUAGE_CHOICE],
+        default=next((c for c in choices if c.value == default), choices[0]),
+    )
+    if chosen == CUSTOM_LANGUAGE_CHOICE:
+        return _text("Language code (ISO 639-1, e.g. en, ru, es, fr)", default=default)
     return chosen
 
 
@@ -188,6 +205,7 @@ def _run_setup_flow() -> dict[str, str]:
             data["OPO_HOST"] = custom_url.strip()
 
     data["OPO_BASE"] = _text("Default base branch", default=data["OPO_BASE"])
+    data["OPO_LANGUAGE"] = _pick_language(default=data["OPO_LANGUAGE"])
     return data
 
 
