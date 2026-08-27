@@ -40,7 +40,9 @@ class AnthropicProvider(BaseLLMProvider):
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
             )
-            return message.content[0].text
+            return "".join(
+                block.text for block in message.content if block.type == "text"
+            )
         except Exception as exc:
             raise AnthropicError(str(exc)) from exc
 
