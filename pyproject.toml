@@ -1,6 +1,6 @@
 [project]
 name = "openpurr"
-version = "0.8.8"
+version = "0.8.9"
 description = "CLI tool to generate PR titles, descriptions, and post-review change summaries using a local or cloud LLM."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }
@@ -21,6 +21,7 @@ Repository = "https://github.com/ilypopv/openpurr"
 
 [project.scripts]
 opo = "openpurr.main:app"
+openpurr = "openpurr.main:app"
 
 [build-system]
 requires = ["hatchling"]
