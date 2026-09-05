@@ -35,3 +35,9 @@ dev = ["pytest>=8.0.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
