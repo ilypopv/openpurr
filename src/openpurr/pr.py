@@ -13,7 +13,7 @@ from openpurr.utils import git
 console = Console()
 
 _THINK_BLOCK_RE = re.compile(
-    r"<(?:think|thought|thinking|reasoning)[^>]*>.*?</(?:think|thought|thinking|reasoning)>",
+    r"(?<!`)<(?:think|thought|thinking|reasoning)[^>]*>.*?</(?:think|thought|thinking|reasoning)>(?!`)",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -39,12 +39,16 @@ def _strip_thinking(text: str) -> str:
     untagged markdown preamble before the real answer. This helper
     performs two phases:
 
-    1.  Strip any tagged thinking blocks.
+    1.  Strip any tagged thinking blocks that are **not** inside inline
+        code (`` `<tag>` ``). Inline examples in the legitimate PR body
+        like `` `<thought>` `` are preserved via a negative lookaround
+        for backticks.
     2.  Anchor on the required Markdown template markers
         (``## 📝 Summary`` for PRs, ``## 🔄 Changes since last review`` for
-        reviews) and, for PRs, walk back to the last bare Conventional
-        Commit title before that marker. Everything before the title is
-        discarded as leaked reasoning.
+        reviews) and, for PRs, walk back to the last Conventional Commit
+        title before that marker (found anywhere, even inside
+        `` `feat(...): ...` ``). Everything before the title is discarded
+        as leaked reasoning.
 
     Tagged stripping alone is not enough because recent models emit
     untagged bullet-point reasoning that still confuses the user.
