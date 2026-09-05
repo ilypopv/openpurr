@@ -16,11 +16,30 @@ _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 
 
 def _strip_thinking(text: str) -> str:
-    """Drop a leaked <think>...</think> reasoning block some models emit inline."""
+    """Remove leaked thinking blocks from model output.
+
+    Some reasoning models emit ``<think>...</think>`` inline. This helper
+    strips those blocks so only the final answer is shown.
+
+    Args:
+        text: Raw model output, possibly containing thinking tags.
+
+    Returns:
+        Text with all ``<think>...</think>`` blocks removed and stripped.
+    """
     return _THINK_BLOCK_RE.sub("", text).strip()
 
 
 def _init_system_prompt(language: str) -> str:
+    """Build the system prompt for PR title and description generation.
+
+    Args:
+        language: ISO 639-1 language code for the output.
+
+    Returns:
+        System prompt string that instructs the LLM to follow the PR
+        template in the requested language.
+    """
     return f"""\
 You are a Senior Principal Engineer. Based on the provided git diff, generate a Pull Request Title and Description.
 
@@ -49,6 +68,15 @@ TEMPLATE (replace the placeholders, keep everything else verbatim):
 
 
 def _review_system_prompt(language: str) -> str:
+    """Build the system prompt for review summary generation.
+
+    Args:
+        language: ISO 639-1 language code for the output.
+
+    Returns:
+        System prompt string that instructs the LLM to summarize changes
+        since the last review in the requested language.
+    """
     return f"""\
 You are a Senior Principal Engineer. Based on the git diff of changes made during code review, write a concise summary for the reviewer.
 
@@ -70,6 +98,14 @@ REVIEW_SYSTEM_PROMPT = _review_system_prompt("en")
 
 
 def _require_model(config: Config) -> None:
+    """Ensure a model is configured, exiting with a hint otherwise.
+
+    Args:
+        config: Resolved openpurr configuration.
+
+    Raises:
+        SystemExit: If ``config.llm_model`` is empty, after printing a hint.
+    """
     if not config.llm_model:
         console.print(
             "[bold red]No model configured.[/bold red] Run [bold cyan]opo setup[/bold cyan] "
@@ -79,6 +115,21 @@ def _require_model(config: Config) -> None:
 
 
 def run_init(base: str | None, config: Config) -> None:
+    """Generate and print a PR title and description from the git diff.
+
+    Extracts the diff against ``base`` (or the configured default), checks
+    for empty diffs, and delegates generation to the configured LLM provider.
+    The result is printed to the console after stripping any thinking blocks.
+
+    Args:
+        base: Base branch to diff against. If ``None``, the value from
+            ``config.pr_default_base`` is used.
+        config: Resolved openpurr configuration.
+
+    Raises:
+        SystemExit: If no model is configured, no changes are detected, or a
+            git error occurs.
+    """
     _require_model(config)
     base_ref = base or config.pr_default_base
     console.print(f"[bold cyan]Extracting diff against '{base_ref}'...[/bold cyan]")
@@ -113,6 +164,19 @@ def run_init(base: str | None, config: Config) -> None:
 
 
 def run_review(commits: int, config: Config) -> None:
+    """Generate and print a post-review changes summary.
+
+    Extracts the diff for the last ``commits`` commits and delegates
+    generation to the configured LLM provider.
+
+    Args:
+        commits: Number of recent commits to summarize (``HEAD~N..HEAD``).
+        config: Resolved openpurr configuration.
+
+    Raises:
+        SystemExit: If no model is configured, no changes are detected, or a
+            git error occurs.
+    """
     _require_model(config)
     console.print(
         f"[bold cyan]Extracting diff for the last {commits} commit(s)...[/bold cyan]"

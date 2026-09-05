@@ -60,7 +60,7 @@ class TestGetDiff:
 
         def _run(args, **kwargs):
             m = MagicMock()
-            m.stdout = name_only_output if "--name-only" in args else diff_output
+            m.stdout = name_only_output if "--name-status" in args else diff_output
             return m
 
         return _run
@@ -113,7 +113,7 @@ class TestGetDiff:
         def fake_run(args, **kwargs):
             calls.append(list(args))
             m = MagicMock()
-            m.stdout = "src/app.py\n" if "--name-only" in args else "diff"
+            m.stdout = "M\tsrc/app.py\n" if "--name-status" in args else "diff"
             return m
 
         with patch("openpurr.utils.git.subprocess.run", side_effect=fake_run):
@@ -152,7 +152,7 @@ class TestGetRecentCommitsDiff:
         def fake_run(args, **kwargs):
             calls.append(list(args))
             m = MagicMock()
-            m.stdout = "src/foo.py\n" if "--name-only" in args else "diff"
+            m.stdout = "M\tsrc/foo.py\n" if "--name-status" in args else "diff"
             return m
 
         with patch("openpurr.utils.git.subprocess.run", side_effect=fake_run):
@@ -167,7 +167,7 @@ class TestGetRecentCommitsDiff:
         def fake_run(args, **kwargs):
             calls.append(list(args))
             m = MagicMock()
-            m.stdout = "src/foo.py\n" if "--name-only" in args else "diff"
+            m.stdout = "M\tsrc/foo.py\n" if "--name-status" in args else "diff"
             return m
 
         with patch("openpurr.utils.git.subprocess.run", side_effect=fake_run):
@@ -187,7 +187,9 @@ class TestGetRecentCommitsDiff:
         def fake_run(args, **kwargs):
             m = MagicMock()
             m.stdout = (
-                "src/app.py\npnpm-lock.yaml\n" if "--name-only" in args else "diff"
+                "M\tsrc/app.py\nM\tpnpm-lock.yaml\n"
+                if "--name-status" in args
+                else "diff"
             )
             return m
 

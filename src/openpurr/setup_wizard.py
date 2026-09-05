@@ -54,10 +54,23 @@ _STYLE = questionary.Style(
 
 
 class _SetupAborted(Exception):
-    """Raised when the user cancels a prompt (Ctrl-C / Esc)."""
+    """Raised when the user cancels a prompt via Ctrl-C or Esc."""
 
 
 def _select(message: str, choices, default=None) -> str:
+    """Prompt the user to select from a list of choices.
+
+    Args:
+        message: Prompt message to display.
+        choices: List of ``questionary.Choice`` or string options.
+        default: Default choice to pre-select.
+
+    Returns:
+        The selected value.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     result = questionary.select(
         message, choices=choices, default=default, style=_STYLE
     ).ask()
@@ -67,6 +80,18 @@ def _select(message: str, choices, default=None) -> str:
 
 
 def _text(message: str, default: str = "") -> str:
+    """Prompt the user for free-text input.
+
+    Args:
+        message: Prompt message to display.
+        default: Default value to show in the input.
+
+    Returns:
+        The entered text.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     result = questionary.text(message, default=default, style=_STYLE).ask()
     if result is None:
         raise _SetupAborted
@@ -74,6 +99,17 @@ def _text(message: str, default: str = "") -> str:
 
 
 def _password(message: str) -> str:
+    """Prompt the user for a password / API key.
+
+    Args:
+        message: Prompt message to display.
+
+    Returns:
+        The entered password string.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     result = questionary.password(message, style=_STYLE).ask()
     if result is None:
         raise _SetupAborted
@@ -81,6 +117,19 @@ def _password(message: str) -> str:
 
 
 def _pick_model(models: list[str], default_text: str = "") -> str:
+    """Let the user pick a model from a list or enter a custom name.
+
+    Args:
+        models: List of available model names. Empty list prompts for a
+            custom name directly.
+        default_text: Default text for the custom input prompt.
+
+    Returns:
+        Selected or entered model name.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     if not models:
         return _text("Model name", default=default_text)
     chosen = _select("Select a model:", choices=[*models, CUSTOM_MODEL_CHOICE])
@@ -90,6 +139,17 @@ def _pick_model(models: list[str], default_text: str = "") -> str:
 
 
 def _pick_language(default: str = "en") -> str:
+    """Let the user pick an output language.
+
+    Args:
+        default: Default language code to pre-select.
+
+    Returns:
+        Selected language code.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     choices = [
         questionary.Choice(title=f"{name} ({code})", value=code)
         for code, name in LANGUAGES.items()
@@ -105,12 +165,21 @@ def _pick_language(default: str = "en") -> str:
 
 
 def _validate_model(provider: str, model: str, partial: dict[str, str]) -> str | None:
-    """Try one real, minimal request against `model`. None on success, else the error text.
+    """Try a minimal request to verify that a model is usable.
 
     No provider's model-list endpoint reliably marks a model as still usable —
     OpenAI/Anthropic expose no deprecation flag, and Gemini's "no longer
     available to new users" restriction only surfaces at request time. Actually
     calling the model is the only trustworthy check.
+
+    Args:
+        provider: Provider key.
+        model: Model name to test.
+        partial: Partial config dict to build a trial provider (must contain
+            at least the provider-specific auth/host keys).
+
+    Returns:
+        ``None`` on success, otherwise the error message as a string.
     """
     trial = build_provider(
         Config({**partial, "OPO_PROVIDER": provider, "OPO_MODEL": model})
@@ -125,6 +194,20 @@ def _validate_model(provider: str, model: str, partial: dict[str, str]) -> str |
 def _pick_and_validate_model(
     provider: str, models: list[str], partial: dict[str, str], default_text: str = ""
 ) -> str:
+    """Prompt for a model with live validation and retry/skip logic.
+
+    Args:
+        provider: Provider key.
+        models: List of available model names.
+        partial: Partial config dict for trial validation.
+        default_text: Default text for custom model input.
+
+    Returns:
+        Selected model name, validated or explicitly skipped.
+
+    Raises:
+        _SetupAborted: If the user cancels the prompt.
+    """
     remaining = list(models)
     while True:
         model = _pick_model(remaining, default_text=default_text)
@@ -146,6 +229,14 @@ def _pick_and_validate_model(
 
 
 def _run_setup_flow() -> dict[str, str]:
+    """Run the interactive provider and preference selection flow.
+
+    Returns:
+        Flat config dictionary ready to be written via :func:`write_config`.
+
+    Raises:
+        _SetupAborted: If the user cancels any prompt.
+    """
     data = dict(DEFAULT_CONFIG)
 
     console.print("[bold]Select your AI provider:[/bold]")
@@ -210,9 +301,13 @@ def _run_setup_flow() -> dict[str, str]:
 
 
 def run_setup() -> bool:
-    """
-    Run the interactive setup wizard.
-    Writes ~/.openpurr and returns True on success, False if the user aborts.
+    """Run the interactive setup wizard.
+
+    Writes the configuration to :data:`CONFIG_PATH` via the wizard flow.
+
+    Returns:
+        True if setup completed and the config was written, False if the
+        user aborted.
     """
     console.print(
         Panel(

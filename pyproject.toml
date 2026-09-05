@@ -1,6 +1,6 @@
 [project]
 name = "openpurr"
-version = "0.8.9"
+version = "0.8.11"
 description = "CLI tool to generate PR titles, descriptions, and post-review change summaries using a local or cloud LLM."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }

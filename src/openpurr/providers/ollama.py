@@ -1,4 +1,8 @@
-"""Ollama LLM provider."""
+"""Ollama LLM provider.
+
+Implements :class:`openpurr.providers.base.BaseLLMProvider` for a local
+Ollama server via its ``/api/generate`` HTTP endpoint.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,22 @@ class OllamaError(RuntimeError):
 
 
 class OllamaProvider(BaseLLMProvider):
+    """LLM provider backed by a local Ollama server.
+
+    Attributes:
+        host: Base URL of the Ollama server, without trailing slash.
+        model: Model name as known to Ollama (e.g. ``gemma3:27b``).
+        timeout: HTTP timeout in seconds for generate calls.
+    """
+
     def __init__(self, host: str, model: str, timeout: float = 300.0) -> None:
+        """Initialize the provider.
+
+        Args:
+            host: Base URL of the Ollama server.
+            model: Model name to query.
+            timeout: HTTP timeout in seconds.
+        """
         self.host = host.rstrip("/")
         self.model = model
         self.timeout = timeout
@@ -28,6 +47,18 @@ class OllamaProvider(BaseLLMProvider):
         keep_alive: str | None,
         stream: bool,
     ) -> dict:
+        """Build the JSON payload for ``/api/generate``.
+
+        Args:
+            prompt: User prompt (git diff).
+            system_prompt: System prompt.
+            temperature: Sampling temperature.
+            keep_alive: Ollama ``keep_alive`` hint.
+            stream: Whether to request streaming.
+
+        Returns:
+            Dictionary suitable for json-encoding as the POST body.
+        """
         return {
             "model": self.model,
             "prompt": prompt,
@@ -48,6 +79,20 @@ class OllamaProvider(BaseLLMProvider):
         temperature: float = 0.0,
         keep_alive: str | None = "5m",
     ) -> str:
+        """Generate a complete completion via Ollama.
+
+        Args:
+            prompt: User prompt.
+            system_prompt: System prompt.
+            temperature: Sampling temperature.
+            keep_alive: VRAM keep-alive duration (e.g. ``"5m"``, ``"0s"``).
+
+        Returns:
+            Generated text; empty string if the response has no ``response`` key.
+
+        Raises:
+            OllamaError: If the server is unreachable or returns an HTTP error.
+        """
         payload = self._payload(
             prompt, system_prompt, temperature, keep_alive, stream=False
         )
@@ -73,6 +118,20 @@ class OllamaProvider(BaseLLMProvider):
         temperature: float = 0.0,
         keep_alive: str | None = "5m",
     ) -> Generator[str, None, None]:
+        """Generate a streaming completion via Ollama.
+
+        Args:
+            prompt: User prompt.
+            system_prompt: System prompt.
+            temperature: Sampling temperature.
+            keep_alive: VRAM keep-alive duration.
+
+        Yields:
+            Text chunks as they arrive from the streaming endpoint.
+
+        Raises:
+            OllamaError: If the server is unreachable or returns an HTTP error.
+        """
         payload = self._payload(
             prompt, system_prompt, temperature, keep_alive, stream=True
         )
