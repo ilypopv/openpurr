@@ -1,4 +1,8 @@
-"""LLM provider factory."""
+"""LLM provider factory.
+
+Selects and instantiates the appropriate :class:`BaseLLMProvider`
+implementation based on :class:`openpurr.config.Config`.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,17 @@ OPENAI_COMPATIBLE_PROVIDERS = frozenset(
 
 
 def build_provider(config: Config) -> BaseLLMProvider:
+    """Build an LLM provider from resolved config.
+
+    Args:
+        config: Resolved openpurr configuration.
+
+    Returns:
+        An instance of :class:`BaseLLMProvider` for the configured provider.
+
+    Raises:
+        ValueError: If the provider key is not supported.
+    """
     provider = config.llm_provider
 
     if provider == "ollama":
