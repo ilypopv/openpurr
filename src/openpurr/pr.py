@@ -12,20 +12,25 @@ from openpurr.utils import git
 
 console = Console()
 
-_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+_THINK_BLOCK_RE = re.compile(
+    r"<(?:think|thought|thinking|reasoning)[^>]*>.*?</(?:think|thought|thinking|reasoning)>",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _strip_thinking(text: str) -> str:
     """Remove leaked thinking blocks from model output.
 
-    Some reasoning models emit ``<think>...</think>`` inline. This helper
-    strips those blocks so only the final answer is shown.
+    Some reasoning models emit ``<think>...</think>`` (and variants like
+    ``<thought>`` / ``<thinking>`` / ``<reasoning>``) inline even when
+    instructed not to. This helper strips those blocks so only the final
+    answer is shown.
 
     Args:
         text: Raw model output, possibly containing thinking tags.
 
     Returns:
-        Text with all ``<think>...</think>`` blocks removed and stripped.
+        Text with all thinking blocks removed and stripped.
     """
     return _THINK_BLOCK_RE.sub("", text).strip()
 
