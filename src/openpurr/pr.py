@@ -17,22 +17,82 @@ _THINK_BLOCK_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+_PR_MARKER = "## 📝 Summary"
+_REVIEW_MARKER = "## 🔄 Changes since last review"
+# Conventional Commit title anywhere in text (bare or inside backticks /
+# "Title: `feat(...): ...`" preamble). Uses word boundary so `*   Title:
+# `feat(x): ...`` is found inside the backticks, and `handles `feat(x):`
+# is also found. Multiline not needed — we search the whole pre-marker
+# chunk and pick the last occurrence.
+_CONVENTIONAL_TITLE_RE = re.compile(
+    r"\b(?:feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)"
+    r"(?:\([^)]+\))?!?:\s+[^\n]+",
+    re.IGNORECASE,
+)
+
 
 def _strip_thinking(text: str) -> str:
-    """Remove leaked thinking blocks from model output.
+    """Remove leaked reasoning and extract the valid PR/review template.
 
-    Some reasoning models emit ``<think>...</think>`` (and variants like
-    ``<thought>`` / ``<thinking>`` / ``<reasoning>``) inline even when
-    instructed not to. This helper strips those blocks so only the final
-    answer is shown.
+    Reasoning models often leak chain-of-thought either as tagged blocks
+    (``<think>``/``<thought>``/``<thinking>``/``<reasoning>``) or as
+    untagged markdown preamble before the real answer. This helper
+    performs two phases:
+
+    1.  Strip any tagged thinking blocks.
+    2.  Anchor on the required Markdown template markers
+        (``## 📝 Summary`` for PRs, ``## 🔄 Changes since last review`` for
+        reviews) and, for PRs, walk back to the last bare Conventional
+        Commit title before that marker. Everything before the title is
+        discarded as leaked reasoning.
+
+    Tagged stripping alone is not enough because recent models emit
+    untagged bullet-point reasoning that still confuses the user.
 
     Args:
-        text: Raw model output, possibly containing thinking tags.
+        text: Raw model output, possibly containing thinking tags and
+            untagged preamble.
 
     Returns:
-        Text with all thinking blocks removed and stripped.
+        Cleaned text containing only the valid PR/review output, stripped
+        of tags and preamble.
     """
-    return _THINK_BLOCK_RE.sub("", text).strip()
+    # Phase 1: strip tagged blocks.
+    text = _THINK_BLOCK_RE.sub("", text)
+
+    # Phase 2: template-anchored extraction. Prefer PR marker, fallback to
+    # review marker. If neither is found, return tag-stripped text.
+    pr_idx = text.find(_PR_MARKER)
+    if pr_idx != -1:
+        before = text[:pr_idx]
+        last_match = None
+        for match in _CONVENTIONAL_TITLE_RE.finditer(before):
+            last_match = match
+        if last_match is not None:
+            cleaned = text[last_match.start() :].strip()
+            # First line may still carry surrounding backticks/quotes from
+            # preamble like "Title: `feat(x): ...`" or "handles `feat(x):".
+            # Strip them so the title is bare per the required template.
+            lines = cleaned.splitlines()
+            if lines:
+                # Remove common wrappers around the title line only.
+                first = lines[0].strip()
+                # If the title was found inside backticks, the match itself
+                # excludes them, but a trailing ` may have been consumed as
+                # part of .+ — trim it.
+                first = first.strip("`'\"")
+                # Also handle stray leading "Title:" prefix if the regex
+                # started after it (should not happen, but be defensive).
+                lines[0] = first
+                cleaned = "\n".join(lines)
+            return cleaned.strip()
+        return text[pr_idx:].strip()
+
+    review_idx = text.find(_REVIEW_MARKER)
+    if review_idx != -1:
+        return text[review_idx:].strip()
+
+    return text.strip()
 
 
 def _init_system_prompt(language: str) -> str:
