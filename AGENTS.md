@@ -9,6 +9,10 @@
 
 No lint/typecheck/formatter config in repo — don't add one unless requested.
 
+## Style — Docstrings
+
+- All scripts in `src/openpurr/**/*.py` must have Google Style docstrings — modules, classes, functions, methods, and properties. Verified with `pydocstyle --convention=google src/openpurr` (zero warnings). Keep Args/Returns/Raises sections consistent; properties use a one-line description, functions with args use full Google sections.
+
 ## Structure
 
 - Single package, `src` layout: `src/openpurr/` → `openpurr.*` (`pyproject.toml:31`). Entry points `opo`/`openpurr` → `openpurr.main:app` (`pyproject.toml:23`).
