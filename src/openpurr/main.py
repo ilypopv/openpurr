@@ -42,11 +42,20 @@ app.add_typer(config_app, name="config")
 
 
 def _config() -> Config:
+    """Load and return the current configuration.
+
+    Returns:
+        Resolved :class:`openpurr.config.Config` from disk.
+    """
     return Config()
 
 
 def _ensure_config() -> None:
-    """Run setup wizard if ~/.openpurr does not exist yet."""
+    """Ensure a config file exists, running the setup wizard if needed.
+
+    Raises:
+        SystemExit: If the user aborts the setup wizard.
+    """
     if is_first_run():
         console.print(
             "[yellow]No configuration found — running setup wizard.[/yellow]\n"
@@ -67,7 +76,16 @@ def main(
         None, "--base", "-b", help="Base branch to diff against."
     ),
 ) -> None:
-    """Generate PR title and description from the current diff."""
+    """Generate PR title and description from the current diff.
+
+    This is the default command when ``opo`` is invoked without a subcommand.
+    It delegates to :func:`openpurr.pr.run_init`.
+
+    Args:
+        ctx: Typer context used to detect subcommand invocation.
+        base: Optional base branch to diff against. Defaults to the
+            configured ``base``.
+    """
     if ctx.invoked_subcommand is not None:
         return
     _ensure_config()
@@ -83,7 +101,12 @@ def review(
         1, "--commits", "-c", help="Number of recent commits to summarize."
     ),
 ) -> None:
-    """Generate a 'Changes since last review' summary from the last N commits."""
+    """Generate a post-review changes summary.
+
+    Args:
+        commits: Number of recent commits to summarize. Corresponds to
+            ``HEAD~N..HEAD``.
+    """
     _ensure_config()
     pr_module.run_review(commits=commits, config=_config())
 
@@ -93,7 +116,11 @@ def review(
 
 @app.command("setup")
 def setup() -> None:
-    """Run the interactive setup wizard to (re)configure ~/.openpurr."""
+    """Run the interactive setup wizard to (re)configure ~/.openpurr.
+
+    Raises:
+        SystemExit: If the user aborts the wizard.
+    """
     from openpurr.setup_wizard import run_setup
 
     if not run_setup():
@@ -109,7 +136,12 @@ def models(
         None, "--provider", "-p", help="Provider to list models for."
     ),
 ) -> None:
-    """List available models for a provider."""
+    """List available models for a provider.
+
+    Args:
+        provider: Provider key to query. If ``None``, the configured
+            provider is used.
+    """
     cfg = _config()
     target = provider or cfg.llm_provider
 
@@ -135,7 +167,11 @@ def models(
 
 @config_app.command("describe")
 def config_describe() -> None:
-    """Show all configuration keys with descriptions and current values."""
+    """Show all configuration keys with descriptions and current values.
+
+    Renders a table of short keys, current values (masked for ``api_key``),
+    and descriptions, plus any active custom prompt overrides.
+    """
     data = load_config()
     table = Table(
         title="openpurr configuration", show_header=True, header_style="bold cyan"
@@ -172,7 +208,14 @@ def config_describe() -> None:
 def config_get(
     key: str = typer.Argument(..., help="Config key, e.g. model"),
 ) -> None:
-    """Print the current value of a configuration key."""
+    """Print the current value of a configuration key.
+
+    Args:
+        key: Short config key (e.g. ``"model"``, ``"provider"``).
+
+    Raises:
+        SystemExit: If the key is unknown.
+    """
     try:
         value = get_config_value(key)
         console.print(str(value))
@@ -189,7 +232,15 @@ def config_set(
     key: str = typer.Argument(..., help="Config key, e.g. model"),
     value: str = typer.Argument(..., help="New value to set"),
 ) -> None:
-    """Update a configuration key in ~/.openpurr."""
+    """Update a configuration key in ~/.openpurr.
+
+    Args:
+        key: Short config key (e.g. ``"model"``).
+        value: New value to persist.
+
+    Raises:
+        SystemExit: If the key is unknown.
+    """
     try:
         set_config_value(key, value)
         console.print(f"[green]Set[/green] [bold]{key}[/bold] = {value}")
