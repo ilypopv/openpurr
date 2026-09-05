@@ -126,7 +126,7 @@ TEMPLATE (replace the placeholders, keep everything else verbatim):
 [2-3 sentences summarizing the core changes]
 
 ## 🛠 Type of Change
-[Plain bullet list of every type that applies, chosen from: Bug fix, New feature, Refactoring, Breaking change. A PR can be more than one type — list all that fit. Do NOT use checkboxes or brackets like "- [ ]", just "- Bug fix".]
+[Plain bullet list of every type that applies, chosen from: Bug fix, New feature, Documentation, Refactoring, Breaking change. A PR can be more than one type — list all that fit. Do NOT use checkboxes or brackets like "- [ ]", just "- Bug fix".]
 
 ## 🔍 Key Changes
 - [Bullet points of technical details]
