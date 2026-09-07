@@ -112,11 +112,19 @@ def _init_system_prompt(language: str) -> str:
     return f"""\
 You are a Senior Principal Engineer. Based on the provided git diff, generate a Pull Request Title and Description.
 
+The git diff is in unified format:
+- Lines starting with '-' were REMOVED/deleted.
+- Lines starting with '+' were ADDED.
+- Lines starting with ' ' (space) are unchanged context.
+- Headers like 'diff --git', '--- a/', '+++ b/', '@@' and 'rename from'/'rename to' are metadata.
+You MUST use the +/- prefixes to distinguish what was deleted vs added. A deleted comment or deleted validation text means documentation was simplified/removed — do NOT describe deleted text as if it were newly added functionality. Only describe code and behaviour that is actually added or that replaces deleted code.
+
 CRITICAL RULES:
 1. Output ONLY the exact template below, filled in — nothing before, after, or between its parts. No preamble, reasoning, analysis, or commentary. Do not think out loud; if you reason internally, never print that reasoning. The Title is REQUIRED and is the first line of output — it is not preamble.
 2. Language: Write entirely in {language_name(language)}.
 3. Title MUST strictly follow Conventional Commits (e.g., feat(auth): add JWT refresh endpoint).
 4. Description MUST strictly follow this Markdown structure.
+5. Diff semantics: pay close attention to '-' vs '+' prefixes; never treat the whole diff as plain text.
 
 TEMPLATE (replace the placeholders, keep everything else verbatim):
 
@@ -149,10 +157,18 @@ def _review_system_prompt(language: str) -> str:
     return f"""\
 You are a Senior Principal Engineer. Based on the git diff of changes made during code review, write a concise summary for the reviewer.
 
+The git diff is in unified format:
+- Lines starting with '-' were REMOVED/deleted.
+- Lines starting with '+' were ADDED.
+- Lines starting with ' ' are unchanged context.
+- Headers like 'diff --git', '--- a/', '+++ b/', '@@' and 'rename from'/'rename to' are metadata.
+You MUST use the +/- prefixes to distinguish what was deleted vs added. A deleted comment means documentation was simplified/removed — do NOT describe deleted text as if it were newly added.
+
 CRITICAL RULES:
 1. Output ONLY the content below — no preamble, reasoning, analysis, or commentary of any kind. Do not think out loud; if you reason internally, never print that reasoning.
 2. Language: Write entirely in {language_name(language)}.
 3. Follow this structure strictly:
+4. Diff semantics: pay close attention to '-' vs '+' prefixes; never treat the whole diff as plain text.
 
 ## 🔄 Changes since last review
 - [Bullet points describing fixes and requested updates]
@@ -164,6 +180,22 @@ CRITICAL RULES:
 # stable name to import; actual generation always resolves via config.llm_language.
 INIT_SYSTEM_PROMPT = _init_system_prompt("en")
 REVIEW_SYSTEM_PROMPT = _review_system_prompt("en")
+
+
+def _format_diff_prompt(diff: str) -> str:
+    """Wrap a raw unified diff with an explicit legend for the LLM.
+
+    The diff itself is already in unified format, but models often treat it
+    as plain text and ignore the ``+/-`` semantics. Adding a short legend
+    makes deletions vs additions unambiguous without altering the diff.
+
+    Args:
+        diff: Raw unified diff text as produced by ``git diff``.
+
+    Returns:
+        Diff text prefixed with a legend that explains ``-``/``+``.
+    """
+    return f"Git diff (unified format; '-' = removed/deleted, '+' = added):\n{diff}"
 
 
 def _require_model(config: Config) -> None:
@@ -221,7 +253,7 @@ def run_init(base: str | None, config: Config) -> None:
         "[bold green]Generating PR title and description...[/bold green]"
     ):
         output = provider.generate(
-            prompt=diff_result.diff,
+            prompt=_format_diff_prompt(diff_result.diff),
             system_prompt=config.custom_init_prompt
             or _init_system_prompt(config.llm_language),
             temperature=config.llm_temperature,
@@ -269,7 +301,7 @@ def run_review(commits: int, config: Config) -> None:
 
     with console.status("[bold green]Generating review summary...[/bold green]"):
         output = provider.generate(
-            prompt=diff_result.diff,
+            prompt=_format_diff_prompt(diff_result.diff),
             system_prompt=config.custom_review_prompt
             or _review_system_prompt(config.llm_language),
             temperature=config.llm_temperature,
