@@ -154,6 +154,7 @@ you're in full control, so specify the language directly in the prompt text if y
 | `keep_alive` | `OPO_KEEP_ALIVE` | `5m` | Ollama VRAM keep-alive (`0s` = unload immediately, `5m` = keep warm) |
 | `base` | `OPO_BASE` | `main` | Default base branch to diff against |
 | `language` | `OPO_LANGUAGE` | `en` | Output language for generated PR text (ISO 639-1 code, e.g. `es`, `fr`, `de`, `ja`, `zh`) |
+| `title_template` | `OPO_TITLE_TEMPLATE` | `$title` | Template for the PR title; `$title` is replaced by the generated title (e.g. `[PROJ-1] $title`) |
 
 There's no hardcoded default model: `opo setup` always has you pick one (from a live-fetched list, or typed manually), and `opo`/`opo review` will error out with a pointer back to `opo setup` if `model` is ever left blank (e.g. after hand-editing the file).
 
