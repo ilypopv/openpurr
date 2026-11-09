@@ -99,6 +99,23 @@ def _strip_thinking(text: str) -> str:
     return text.strip()
 
 
+def _apply_title_template(text: str, template: str) -> str:
+    """Wrap the first line (the PR title) of generated text in a template.
+
+    Args:
+        text: Generated PR text whose first line is the title.
+        template: Template containing the ``$title`` placeholder. A template
+            without the placeholder leaves the text unchanged.
+
+    Returns:
+        Text with the title line replaced by the rendered template.
+    """
+    if "$title" not in template or not text:
+        return text
+    title, sep, rest = text.partition("\n")
+    return template.replace("$title", title.strip()) + sep + rest
+
+
 def _init_system_prompt(language: str) -> str:
     """Build the system prompt for PR title and description generation.
 
@@ -261,7 +278,9 @@ def run_init(base: str | None, config: Config) -> None:
         )
 
     console.print()
-    console.print(_strip_thinking(output))
+    console.print(
+        _apply_title_template(_strip_thinking(output), config.pr_title_template)
+    )
 
 
 def run_review(commits: int, config: Config) -> None:
