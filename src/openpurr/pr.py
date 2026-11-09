@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from rich.console import Console
 
@@ -31,7 +32,7 @@ _CONVENTIONAL_TITLE_RE = re.compile(
 )
 
 
-def _strip_thinking(text: str) -> str:
+def _strip_thinking(text: str, anchor_on_title: bool = False) -> str:
     """Remove leaked reasoning and extract the valid PR/review template.
 
     Reasoning models often leak chain-of-thought either as tagged blocks
@@ -56,6 +57,9 @@ def _strip_thinking(text: str) -> str:
     Args:
         text: Raw model output, possibly containing thinking tags and
             untagged preamble.
+        anchor_on_title: If True and no built-in marker is found (custom repo
+            template), drop everything before the first Conventional Commit
+            title.
 
     Returns:
         Cleaned text containing only the valid PR/review output, stripped
@@ -96,6 +100,11 @@ def _strip_thinking(text: str) -> str:
     if review_idx != -1:
         return text[review_idx:].strip()
 
+    if anchor_on_title:
+        match = _CONVENTIONAL_TITLE_RE.search(text)
+        if match is not None:
+            return text[match.start() :].strip()
+
     return text.strip()
 
 
@@ -116,16 +125,51 @@ def _apply_title_template(text: str, template: str) -> str:
     return template.replace("$title", title.strip()) + sep + rest
 
 
-def _init_system_prompt(language: str) -> str:
+_DEFAULT_STRUCTURE_RULE = "Description MUST strictly follow this Markdown structure."
+
+_REPO_TEMPLATE_RULE = (
+    "Description MUST strictly follow the repository's PR template given below: "
+    "keep its headings, order and wording. HTML comments (<!-- -->) are hints for "
+    "the author — never print them. For checklists, mark applicable items [x] and "
+    "leave the rest [ ]. If a section needs information that cannot be derived "
+    "from the diff (tickets, screenshots, links), write N/A instead of inventing it."
+)
+
+_DEFAULT_TEMPLATE_BODY = """\
+## 📝 Summary
+[2-3 sentences summarizing the core changes]
+
+## 🛠 Type of Change
+[Plain bullet list of every type that applies, chosen from: Bug fix, New feature, Documentation, Refactoring, Breaking change. A PR can be more than one type — list all that fit. Do NOT use checkboxes or brackets like "- [ ]", just "- Bug fix".]
+
+## 🔍 Key Changes
+- [Bullet points of technical details]
+
+## 🧪 How Has This Been Tested?
+- [Testing details derived from diff or code]
+"""
+
+MAX_TEMPLATE_CHARS = 8000
+
+
+def _init_system_prompt(language: str, repo_template: str | None = None) -> str:
     """Build the system prompt for PR title and description generation.
 
     Args:
         language: ISO 639-1 language code for the output.
+        repo_template: Content of the repository's PR template. If ``None``,
+            the built-in description structure is used.
 
     Returns:
         System prompt string that instructs the LLM to follow the PR
         template in the requested language.
     """
+    if repo_template is None:
+        structure_rule = _DEFAULT_STRUCTURE_RULE
+        template_body = _DEFAULT_TEMPLATE_BODY
+    else:
+        structure_rule = _REPO_TEMPLATE_RULE
+        template_body = repo_template.strip() + "\n"
     return f"""\
 You are a Senior Principal Engineer. Based on the provided git diff, generate a Pull Request Title and Description.
 
@@ -140,25 +184,14 @@ CRITICAL RULES:
 1. Output ONLY the exact template below, filled in — nothing before, after, or between its parts. No preamble, reasoning, analysis, or commentary. Do not think out loud; if you reason internally, never print that reasoning. The Title is REQUIRED and is the first line of output — it is not preamble.
 2. Language: Write entirely in {language_name(language)}.
 3. Title MUST strictly follow Conventional Commits (e.g., feat(auth): add JWT refresh endpoint).
-4. Description MUST strictly follow this Markdown structure.
+4. {structure_rule}
 5. Diff semantics: pay close attention to '-' vs '+' prefixes; never treat the whole diff as plain text.
 
 TEMPLATE (replace the placeholders, keep everything else verbatim):
 
 <title as plain text, Conventional Commits format>
 
-## 📝 Summary
-[2-3 sentences summarizing the core changes]
-
-## 🛠 Type of Change
-[Plain bullet list of every type that applies, chosen from: Bug fix, New feature, Documentation, Refactoring, Breaking change. A PR can be more than one type — list all that fit. Do NOT use checkboxes or brackets like "- [ ]", just "- Bug fix".]
-
-## 🔍 Key Changes
-- [Bullet points of technical details]
-
-## 🧪 How Has This Been Tested?
-- [Testing details derived from diff or code]
-"""
+{template_body}"""
 
 
 def _review_system_prompt(language: str) -> str:
@@ -232,7 +265,62 @@ def _require_model(config: Config) -> None:
         raise SystemExit(1)
 
 
-def run_init(base: str | None, config: Config) -> None:
+def _resolve_template(spec: str) -> tuple[str, str] | None:
+    """Resolve a template spec to a readable PR template file.
+
+    Args:
+        spec: ``"off"`` (disabled), ``"auto"`` (best match in the repo), a
+            file path (absolute, repo-relative or cwd-relative), or the name
+            of one of the repo's templates (file name or stem).
+
+    Returns:
+        ``(display_path, content)``, or ``None`` if disabled or ``auto``
+        found nothing.
+
+    Raises:
+        SystemExit: If an explicit ``spec`` matches no file.
+    """
+    spec = spec.strip()
+    if spec.lower() == "off":
+        return None
+    try:
+        found = git.find_pr_templates()
+        root = Path(git.get_repo_root())
+    except git.GitError:
+        found, root = [], Path.cwd()
+
+    if spec.lower() == "auto":
+        if not found:
+            return None
+        path = root / found[0]
+        display = found[0]
+    else:
+        candidates = [Path(spec).expanduser(), root / spec]
+        by_name = [
+            f for f in found if spec.lower() in (Path(f).name.lower(), Path(f).stem.lower())
+        ]
+        if by_name:
+            candidates.append(root / by_name[0])
+        path = next((c for c in candidates if c.is_file()), None)
+        if path is None:
+            hint = f" Available: {', '.join(found)}." if found else ""
+            console.print(f"[bold red]PR template not found:[/bold red] {spec}.{hint}")
+            raise SystemExit(1)
+        display = spec
+
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        console.print(f"[bold red]Cannot read PR template:[/bold red] {exc}")
+        raise SystemExit(1) from exc
+    if not content.strip():
+        return None
+    return display, content
+
+
+def run_init(
+    base: str | None, config: Config, template: str | None = None
+) -> None:
     """Generate and print a PR title and description from the git diff.
 
     Extracts the diff against ``base`` (or the configured default), checks
@@ -243,10 +331,12 @@ def run_init(base: str | None, config: Config) -> None:
         base: Base branch to diff against. If ``None``, the value from
             ``config.pr_default_base`` is used.
         config: Resolved openpurr configuration.
+        template: PR template spec overriding ``config.pr_template``
+            (``auto``, ``off``, a path, or a repo template name).
 
     Raises:
-        SystemExit: If no model is configured, no changes are detected, or a
-            git error occurs.
+        SystemExit: If no model is configured, no changes are detected, a
+            git error occurs, or an explicit template cannot be found.
     """
     _require_model(config)
     base_ref = base or config.pr_default_base
@@ -264,6 +354,18 @@ def run_init(base: str | None, config: Config) -> None:
 
     console.print(f"[dim]{len(diff_result.changed_files)} file(s) changed.[/dim]")
 
+    repo_template: str | None = None
+    if not config.custom_init_prompt:
+        resolved = _resolve_template(template or config.pr_template)
+        if resolved is not None:
+            display, repo_template = resolved
+            console.print(f"[dim]Using PR template: {display}[/dim]")
+            if len(repo_template) > MAX_TEMPLATE_CHARS:
+                console.print(
+                    f"[yellow]Template is longer than {MAX_TEMPLATE_CHARS} chars — truncated.[/yellow]"
+                )
+                repo_template = repo_template[:MAX_TEMPLATE_CHARS]
+
     provider = build_provider(config)
 
     with console.status(
@@ -272,14 +374,17 @@ def run_init(base: str | None, config: Config) -> None:
         output = provider.generate(
             prompt=_format_diff_prompt(diff_result.diff),
             system_prompt=config.custom_init_prompt
-            or _init_system_prompt(config.llm_language),
+            or _init_system_prompt(config.llm_language, repo_template),
             temperature=config.llm_temperature,
             keep_alive=config.llm_keep_alive,
         )
 
     console.print()
     console.print(
-        _apply_title_template(_strip_thinking(output), config.pr_title_template)
+        _apply_title_template(
+            _strip_thinking(output, anchor_on_title=repo_template is not None),
+            config.pr_title_template,
+        )
     )
 
 
