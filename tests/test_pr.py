@@ -130,3 +130,38 @@ class TestRunReview:
         _, kwargs = fake_provider.generate.call_args
         assert "Write entirely in French." in kwargs["system_prompt"]
         assert kwargs["system_prompt"] != pr.REVIEW_SYSTEM_PROMPT
+
+
+class TestTitleTemplate:
+    def test_default_template_is_identity(self):
+        text = "feat: x\n\n## Summary\nbody"
+        assert pr._apply_title_template(text, DEFAULT_CONFIG["OPO_TITLE_TEMPLATE"]) == text
+
+    def test_wraps_only_first_line(self):
+        assert (
+            pr._apply_title_template("feat: x\n\nbody $title", "[PROJ-1] $title")
+            == "[PROJ-1] feat: x\n\nbody $title"
+        )
+
+    def test_template_without_placeholder_leaves_text(self):
+        assert pr._apply_title_template("feat: x\nbody", "static") == "feat: x\nbody"
+
+    def test_run_init_applies_template(self, capsys):
+        fake_provider = MagicMock()
+        fake_provider.generate.return_value = "feat: x\n\nbody"
+        data = {
+            **DEFAULT_CONFIG,
+            "OPO_MODEL": "m",
+            "OPO_TITLE_TEMPLATE": "[PROJ-1] $title",
+        }
+        with (
+            patch.object(
+                pr.git,
+                "get_diff",
+                return_value=GitDiffResult(diff="d", changed_files=["a.py"]),
+            ),
+            patch.object(pr, "build_provider", return_value=fake_provider),
+            patch.object(pr.console, "print") as printed,
+        ):
+            pr.run_init(None, Config(data, prompts={}))
+        assert "[PROJ-1] feat: x\n\nbody" in [c.args[0] for c in printed.call_args_list if c.args]
