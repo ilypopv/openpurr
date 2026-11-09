@@ -24,7 +24,7 @@ No lint/typecheck/formatter config in repo — don't add one unless requested.
 - Format is flat `OPO_KEY=value` lines, no quoting/sections/TOML (`src/openpurr/config.py:1`). Everything after a lone `---` line is free-text prompt overrides — never parsed as env (`_split_config_text:126`).
 - Prompt headers are `INIT PROMPT:` / `REVIEW PROMPT:` (case-insensitive, `PROMPT_HEADERS:86`). `write_config()` preserves existing prompts via `load_prompts()` — `opo config set` never clobbers them (`config.py:159`).
 - Isolated construction: `Config(data={...})` does **not** auto-load prompts from disk unless `prompts` is also passed (`config.py:214`). Tests must monkeypatch `openpurr.config.CONFIG_PATH` to a `tmp_path` file — never write to real `~/.openpurr` (`tests/test_config.py:76`).
-- Short keys map via `SHORT_KEY_MAP` (`config.py:29`): `provider/model/api_key/host/temperature/keep_alive/base/language/title_template` → `OPO_*`. Unknown keys raise `ValueError`.
+- Short keys map via `SHORT_KEY_MAP` (`config.py:29`): `provider/model/api_key/host/temperature/keep_alive/base/language/title_template/pr_template` → `OPO_*`. Unknown keys raise `ValueError`.
 - `resolve_base_url` (`config.py:100`): explicit non-default `host` wins; otherwise `PROVIDER_BASE_URLS` (gemini/openrouter/deepseek/llamacpp/mlx). Default `OPO_HOST` (`http://localhost:11434`) does **not** count as custom.
 
 ## Git & Providers
@@ -33,6 +33,13 @@ No lint/typecheck/formatter config in repo — don't add one unless requested.
 - `get_diff` uses `base...HEAD` three-dot diff; `get_recent_commits_diff` uses `HEAD~N..HEAD`.
 - Rename-aware diff: `get_diff`/`get_recent_commits_diff` use `git diff --name-status` and `_parse_name_status` (`utils/git.py:49`). Passing only the new path (e.g. `--name-only` → `git diff -- new`) makes git render a pure rename as `new file`/`/dev/null` — LLM then hallucinates "add/introduce module". Fix is to pass **both** old+new paths to `git diff --` so the diff keeps `rename from`/`rename to` with `similarity index 100%` headers.
 - `model_catalog.list_models()` never raises — returns `[]` on any failure. `openai`/`gemini` names are filtered by `_NON_CHAT_DENYLIST` (`model_catalog.py:19`). Callers fall back to manual model entry.
+
+## Repo PR Templates
+
+- `OPO_PR_TEMPLATE` = `auto` (default) | `off` | path; CLI `opo -t/--template` overrides it. Discovery: `git.find_pr_templates` (`utils/git.py`, ranked by `_template_rank`); resolution + `Using PR template:` output: `pr._resolve_template`; prompt injection: `pr._init_system_prompt(language, repo_template)`.
+- Precedence: custom `INIT PROMPT` (skips templates entirely) > repo template > built-in. With a repo template, `_strip_thinking(..., anchor_on_title=True)` falls back to the first Conventional Commit title because the `## 📝 Summary` marker is absent.
+- Possible phase 2 (not built): parse template headings and have the LLM fill only section bodies (JSON), rendering the Markdown in code — sturdier for small models.
+- Tests in `tests/test_pr.py` set `OPO_PR_TEMPLATE=off` in `_cfg` so they never touch real git.
 
 ## Testing Notes
 

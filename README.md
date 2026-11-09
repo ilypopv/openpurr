@@ -155,6 +155,7 @@ you're in full control, so specify the language directly in the prompt text if y
 | `base` | `OPO_BASE` | `main` | Default base branch to diff against |
 | `language` | `OPO_LANGUAGE` | `en` | Output language for generated PR text (ISO 639-1 code, e.g. `es`, `fr`, `de`, `ja`, `zh`) |
 | `title_template` | `OPO_TITLE_TEMPLATE` | `$title` | Template for the PR title; `$title` is replaced by the generated title (e.g. `[PROJ-1] $title`) |
+| `pr_template` | `OPO_PR_TEMPLATE` | `auto` | Repo PR template for the description: `auto` (detect), `off` (built-in structure) or a path to a template file |
 
 There's no hardcoded default model: `opo setup` always has you pick one (from a live-fetched list, or typed manually), and `opo`/`opo review` will error out with a pointer back to `opo setup` if `model` is ever left blank (e.g. after hand-editing the file).
 
@@ -173,6 +174,23 @@ Model names aren't hardcoded anywhere in this README on purpose — providers re
 ```bash
 opo config set keep_alive 0s
 ```
+
+### Repository PR templates
+
+By default `opo` looks for a PR template in the repository (tracked or untracked, case-insensitive) and
+fills it in instead of its built-in structure. Search order: `.github/pull_request_template.md`, repo root,
+`docs/`, any other location (shallowest first), `.github/PULL_REQUEST_TEMPLATE/*.md`, then GitLab
+`.gitlab/merge_request_templates/*.md`. The chosen file is printed (`Using PR template: ...`).
+
+```bash
+opo --template off                                  # use the built-in structure
+opo -t .github/PULL_REQUEST_TEMPLATE/feature.md     # pick a file (or just: -t feature)
+opo config set pr_template off                      # disable permanently
+```
+
+Priority: custom `INIT PROMPT` in `~/.openpurr` > repo template > built-in structure. HTML comments in the
+template are treated as hints and not printed; checklists are ticked where applicable; sections that cannot
+be derived from the diff are filled with `N/A`. Templates over 8000 characters are truncated.
 
 ### Example: generate PR text in another language
 

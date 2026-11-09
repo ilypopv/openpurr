@@ -198,3 +198,35 @@ class TestGetRecentCommitsDiff:
 
         assert "src/app.py" in result.changed_files
         assert "pnpm-lock.yaml" not in result.changed_files
+
+
+class TestFindPrTemplates:
+    def test_priority_order_and_case_insensitive(self):
+        from openpurr.utils import git as g
+
+        listing = "\n".join(
+            [
+                "README.md",
+                "docs/pull_request_template.md",
+                "pkg/sub/pull_request_template.md",
+                ".gitlab/merge_request_templates/Bug.md",
+                ".github/PULL_REQUEST_TEMPLATE/feature.md",
+                "PULL_REQUEST_TEMPLATE.md",
+                ".github/PULL_REQUEST_TEMPLATE.md",
+            ]
+        )
+        with patch.object(g, "_run_git", return_value=listing):
+            assert g.find_pr_templates() == [
+                ".github/PULL_REQUEST_TEMPLATE.md",
+                "PULL_REQUEST_TEMPLATE.md",
+                "docs/pull_request_template.md",
+                "pkg/sub/pull_request_template.md",
+                ".github/PULL_REQUEST_TEMPLATE/feature.md",
+                ".gitlab/merge_request_templates/Bug.md",
+            ]
+
+    def test_none_found(self):
+        from openpurr.utils import git as g
+
+        with patch.object(g, "_run_git", return_value="a.py\nREADME.md\n"):
+            assert g.find_pr_templates() == []

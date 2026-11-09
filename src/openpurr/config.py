@@ -25,6 +25,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "OPO_BASE": "main",
     "OPO_LANGUAGE": "en",
     "OPO_TITLE_TEMPLATE": "$title",
+    "OPO_PR_TEMPLATE": "auto",
 }
 
 # Short CLI keys → OPO_* env keys
@@ -38,6 +39,7 @@ SHORT_KEY_MAP: dict[str, str] = {
     "base": "OPO_BASE",
     "language": "OPO_LANGUAGE",
     "title_template": "OPO_TITLE_TEMPLATE",
+    "pr_template": "OPO_PR_TEMPLATE",
 }
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
@@ -50,6 +52,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "base": "Default base branch to diff against (main, master, …)",
     "language": "Output language for generated PR text (ISO 639-1 code, e.g. en, ru, es, fr, de, ja, zh)",
     "title_template": "PR title template — $title is replaced by the generated title (e.g. '[PROJ-1] $title')",
+    "pr_template": "Repo PR template for the description — auto (detect pull_request_template.md) | off | path to a template file",
 }
 
 # ISO 639-1 code → English name, used to phrase the language instruction in the
@@ -352,6 +355,7 @@ class Config:
         pr_default_base: Default base branch for PR diffs.
         llm_language: ISO 639-1 language code.
         pr_title_template: Template for the generated PR title.
+        pr_template: PR description template source (``auto``/``off``/path).
         custom_init_prompt: Override for the init system prompt.
         custom_review_prompt: Override for the review system prompt.
     """
@@ -427,6 +431,11 @@ class Config:
         return self._data.get(
             "OPO_TITLE_TEMPLATE", DEFAULT_CONFIG["OPO_TITLE_TEMPLATE"]
         )
+
+    @property
+    def pr_template(self) -> str:
+        """PR description template source: ``auto``, ``off`` or a file path."""
+        return self._data.get("OPO_PR_TEMPLATE", DEFAULT_CONFIG["OPO_PR_TEMPLATE"])
 
     @property
     def custom_init_prompt(self) -> str:

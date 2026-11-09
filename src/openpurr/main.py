@@ -75,6 +75,12 @@ def main(
     base: str | None = typer.Option(
         None, "--base", "-b", help="Base branch to diff against."
     ),
+    template: str | None = typer.Option(
+        None,
+        "--template",
+        "-t",
+        help="PR template: auto, off, a file path, or a repo template name.",
+    ),
 ) -> None:
     """Generate PR title and description from the current diff.
 
@@ -85,11 +91,13 @@ def main(
         ctx: Typer context used to detect subcommand invocation.
         base: Optional base branch to diff against. Defaults to the
             configured ``base``.
+        template: Optional PR template spec overriding the configured
+            ``pr_template``.
     """
     if ctx.invoked_subcommand is not None:
         return
     _ensure_config()
-    pr_module.run_init(base=base, config=_config())
+    pr_module.run_init(base=base, config=_config(), template=template)
 
 
 # ─── opo review ──────────────────────────────────────────────────────────────
