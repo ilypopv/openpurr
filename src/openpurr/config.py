@@ -1,7 +1,7 @@
 """Configuration loader and writer for openpurr (~/.openpurr).
 
 Storage format is flat ``OPO_KEY=value`` lines (no sections, no quoting) —
-mirrors opencommit's ``~/.opencommit`` rather than TOML. Everything after a
+dotenv-style rather than TOML. Everything after a
 line containing only ``---`` is a free-text area for custom system prompt
 overrides (see :data:`PROMPT_HEADERS`), kept out of the ``OPO_KEY=value``
 parsing entirely so prompt text can contain ``=``, brackets, anything.
@@ -9,6 +9,7 @@ parsing entirely so prompt text can contain ``=``, brackets, anything.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ DEFAULT_CONFIG: dict[str, str] = {
     "OPO_KEEP_ALIVE": "5m",
     "OPO_BASE": "main",
     "OPO_LANGUAGE": "en",
+    "OPO_TITLE_TEMPLATE": "$title",
 }
 
 # Short CLI keys → OPO_* env keys
@@ -35,6 +37,7 @@ SHORT_KEY_MAP: dict[str, str] = {
     "keep_alive": "OPO_KEEP_ALIVE",
     "base": "OPO_BASE",
     "language": "OPO_LANGUAGE",
+    "title_template": "OPO_TITLE_TEMPLATE",
 }
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
@@ -46,6 +49,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "keep_alive": "Ollama VRAM keep-alive duration — 0s = unload immediately, 5m = keep 5 min",
     "base": "Default base branch to diff against (main, master, …)",
     "language": "Output language for generated PR text (ISO 639-1 code, e.g. en, ru, es, fr, de, ja, zh)",
+    "title_template": "PR title template — $title is replaced by the generated title (e.g. '[PROJ-1] $title')",
 }
 
 # ISO 639-1 code → English name, used to phrase the language instruction in the
@@ -141,6 +145,8 @@ def _parse_env(text: str) -> dict[str, str]:
     """Parse flat ``KEY=value`` lines.
 
     Blank lines, comments (``#``), and lines without ``=`` are ignored.
+    An inline comment (whitespace followed by ``#``) is cut from the value,
+    like dotenv does; a ``#`` glued to the value stays.
     Whitespace around keys and values is stripped. No quoting or escaping
     is performed.
 
@@ -156,6 +162,7 @@ def _parse_env(text: str) -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
+        value = re.split(r"\s#", value, maxsplit=1)[0]
         data[key.strip()] = value.strip()
     return data
 
@@ -344,6 +351,7 @@ class Config:
         llm_keep_alive: Ollama VRAM keep-alive string.
         pr_default_base: Default base branch for PR diffs.
         llm_language: ISO 639-1 language code.
+        pr_title_template: Template for the generated PR title.
         custom_init_prompt: Override for the init system prompt.
         custom_review_prompt: Override for the review system prompt.
     """
@@ -412,6 +420,13 @@ class Config:
     def llm_language(self) -> str:
         """Output language code (ISO 639-1)."""
         return self._data.get("OPO_LANGUAGE", DEFAULT_CONFIG["OPO_LANGUAGE"])
+
+    @property
+    def pr_title_template(self) -> str:
+        """PR title template; ``$title`` is replaced by the generated title."""
+        return self._data.get(
+            "OPO_TITLE_TEMPLATE", DEFAULT_CONFIG["OPO_TITLE_TEMPLATE"]
+        )
 
     @property
     def custom_init_prompt(self) -> str:
