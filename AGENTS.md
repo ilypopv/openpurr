@@ -24,7 +24,7 @@ No lint/typecheck/formatter config in repo — don't add one unless requested.
 - Format is flat `OPO_KEY=value` lines, no quoting/sections/TOML (`src/openpurr/config.py:1`). Everything after a lone `---` line is free-text prompt overrides — never parsed as env (`_split_config_text:126`).
 - Prompt headers are `INIT PROMPT:` / `REVIEW PROMPT:` (case-insensitive, `PROMPT_HEADERS:86`). `write_config()` preserves existing prompts via `load_prompts()` — `opo config set` never clobbers them (`config.py:159`).
 - Isolated construction: `Config(data={...})` does **not** auto-load prompts from disk unless `prompts` is also passed (`config.py:214`). Tests must monkeypatch `openpurr.config.CONFIG_PATH` to a `tmp_path` file — never write to real `~/.openpurr` (`tests/test_config.py:76`).
-- Short keys map via `SHORT_KEY_MAP` (`config.py:29`): `provider/model/api_key/host/temperature/keep_alive/base/language` → `OPO_*`. Unknown keys raise `ValueError`.
+- Short keys map via `SHORT_KEY_MAP` (`config.py:29`): `provider/model/api_key/host/temperature/keep_alive/base/language/title_template` → `OPO_*`. Unknown keys raise `ValueError`.
 - `resolve_base_url` (`config.py:100`): explicit non-default `host` wins; otherwise `PROVIDER_BASE_URLS` (gemini/openrouter/deepseek/llamacpp/mlx). Default `OPO_HOST` (`http://localhost:11434`) does **not** count as custom.
 
 ## Git & Providers
