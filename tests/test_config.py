@@ -41,6 +41,12 @@ class TestParseEnv:
             "OPO_PROVIDER": "ollama"
         }
 
+    def test_inline_comment_stripped(self):
+        assert _parse_env("OPO_MODEL=a:1b #b:2b\n") == {"OPO_MODEL": "a:1b"}
+
+    def test_hash_without_space_kept(self):
+        assert _parse_env("OPO_API_KEY=ab#cd\n") == {"OPO_API_KEY": "ab#cd"}
+
     def test_lines_without_equals_ignored(self):
         assert _parse_env("not a kv line\nOPO_PROVIDER=ollama\n") == {
             "OPO_PROVIDER": "ollama"
@@ -325,6 +331,11 @@ class TestLanguageName:
 
 
 class TestConfigClass:
+    def test_title_template_default_and_override(self):
+        assert Config({}, prompts={}).pr_title_template == "$title"
+        cfg = Config({"OPO_TITLE_TEMPLATE": "[X] $title"}, prompts={})
+        assert cfg.pr_title_template == "[X] $title"
+
     def test_all_properties(self, monkeypatch, tmp_path):
         p = tmp_path / ".openpurr"
         p.write_text(
