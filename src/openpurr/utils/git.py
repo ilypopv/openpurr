@@ -178,3 +178,73 @@ def get_current_branch() -> str:
         GitError: If the git command fails or the repository is not a git repo.
     """
     return _run_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
+
+
+_SINGLE_TEMPLATE_NAMES = ("pull_request_template.md", "pull_request_template.markdown")
+_GITHUB_TEMPLATE_DIR = ".github/pull_request_template/"
+_GITLAB_TEMPLATE_DIR = ".gitlab/merge_request_templates/"
+
+
+def _template_rank(path: str) -> tuple[int, int, str] | None:
+    """Rank a repo-relative path as a PR template candidate.
+
+    Args:
+        path: Repo-relative path with forward slashes.
+
+    Returns:
+        A sort key ``(group, depth, path)`` (lower wins), or ``None`` if the
+        path is not a PR/MR template. Groups: ``.github/`` single file, repo
+        root, ``docs/``, any other location, ``.github/PULL_REQUEST_TEMPLATE/``
+        directory, GitLab merge request templates.
+    """
+    lower = path.lower()
+    depth = lower.count("/")
+    if lower.startswith(_GITHUB_TEMPLATE_DIR) and lower.endswith(".md"):
+        return (4, depth, lower)
+    if lower.startswith(_GITLAB_TEMPLATE_DIR) and lower.endswith(".md"):
+        return (5, depth, lower)
+    if lower.rsplit("/", 1)[-1] not in _SINGLE_TEMPLATE_NAMES:
+        return None
+    if lower.startswith(".github/") and depth == 1:
+        return (0, depth, lower)
+    if depth == 0:
+        return (1, depth, lower)
+    if lower.startswith("docs/") and depth == 1:
+        return (2, depth, lower)
+    return (3, depth, lower)
+
+
+def find_pr_templates() -> list[str]:
+    """Find PR/MR template files in the repository.
+
+    Considers tracked and untracked-but-not-ignored files. Matching is
+    case-insensitive.
+
+    Returns:
+        Repo-relative paths ordered by priority (best first); empty if the
+        repository has no template.
+
+    Raises:
+        GitError: If the git command fails or this is not a git repository.
+    """
+    output = _run_git(
+        ["ls-files", "--cached", "--others", "--exclude-standard", "--full-name"]
+    )
+    ranked = [
+        (rank, path)
+        for path in output.splitlines()
+        if (rank := _template_rank(path)) is not None
+    ]
+    return [path for _, path in sorted(ranked)]
+
+
+def get_repo_root() -> str:
+    """Get the absolute path of the repository root.
+
+    Returns:
+        Absolute path of the top-level directory of the working tree.
+
+    Raises:
+        GitError: If the git command fails or this is not a git repository.
+    """
+    return _run_git(["rev-parse", "--show-toplevel"]).strip()
